@@ -1,0 +1,104 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Fov.it — Register</title>
+  <style>
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+    body {
+      font-family: 'Segoe UI', sans-serif;
+      background: #0a0a0a; color: #fff;
+      min-height: 100vh; display: flex;
+      align-items: center; justify-content: center; padding: 20px;
+    }
+    .container {
+      background: #141414; padding: 40px;
+      border-radius: 12px; border: 1px solid #222;
+      width: 100%; max-width: 420px;
+    }
+    h1 { color: #00ff88; text-align: center; margin-bottom: 8px; font-size: 28px; }
+    .subtitle { text-align: center; color: #666; font-size: 13px; margin-bottom: 30px; }
+    label { display: block; margin-bottom: 6px; color: #aaa; font-size: 13px; }
+    input {
+      width: 100%; padding: 12px; background: #0a0a0a;
+      border: 1px solid #222; border-radius: 6px;
+      color: #fff; font-size: 14px; margin-bottom: 18px; outline: none;
+    }
+    input:focus { border-color: #00ff88; }
+    button {
+      width: 100%; padding: 12px; background: #00ff88; color: #0a0a0a;
+      border: none; border-radius: 6px; font-size: 15px;
+      font-weight: bold; cursor: pointer;
+    }
+    button:hover { background: #00cc6a; }
+    button:disabled { background: #444; cursor: not-allowed; }
+    .link { text-align: center; margin-top: 20px; color: #666; font-size: 13px; }
+    .link a { color: #00ff88; text-decoration: none; }
+    .error {
+      background: #2a0a0a; border: 1px solid #ff4444; color: #ff6666;
+      padding: 10px; border-radius: 6px; margin-bottom: 18px;
+      font-size: 13px; display: none;
+    }
+    .success {
+      background: #0a2a0a; border: 1px solid #00ff88; color: #00ff88;
+      padding: 10px; border-radius: 6px; margin-bottom: 18px;
+      font-size: 13px; display: none;
+    }
+    .hint { color: #555; font-size: 11px; margin-top: -12px; margin-bottom: 16px; }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <h1>Fov.it</h1>
+    <p class="subtitle">Create your account</p>
+    <div class="error" id="error"></div>
+    <div class="success" id="success"></div>
+    <form id="registerForm">
+      <label>Username</label>
+      <input type="text" id="username" required minlength="3" autocomplete="username">
+      
+      <label>Password</label>
+      <input type="password" id="password" required minlength="6" autocomplete="new-password">
+      <p class="hint">Minimum 6 characters</p>
+      
+      <label>Age</label>
+      <input type="number" id="age" required min="10" max="100">
+      
+      <button type="submit" id="submitBtn">Register</button>
+    </form>
+    <p class="link">May account na? <a href="/">Login</a></p>
+  </div>
+  <script>
+    document.getElementById('registerForm').addEventListener('submit', async (e) => {
+      e.preventDefault();
+      const btn = document.getElementById('submitBtn');
+      const errorBox = document.getElementById('error');
+      const successBox = document.getElementById('success');
+      btn.disabled = true; btn.textContent = 'Creating...';
+      errorBox.style.display = 'none';
+      successBox.style.display = 'none';
+      try {
+        const res = await fetch('/api/register', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            username: document.getElementById('username').value.trim(),
+            password: document.getElementById('password').value,
+            age: parseInt(document.getElementById('age').value)
+          })
+        });
+        const data = await res.json();
+        if (!res.ok) throw new Error(data.error || 'Registration failed');
+        successBox.textContent = 'Account created! Redirecting...';
+        successBox.style.display = 'block';
+        setTimeout(() => window.location.href = '/', 1500);
+      } catch (err) {
+        errorBox.textContent = err.message;
+        errorBox.style.display = 'block';
+        btn.disabled = false; btn.textContent = 'Register';
+      }
+    });
+  </script>
+</body>
+</html>
