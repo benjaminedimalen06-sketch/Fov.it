@@ -18,29 +18,29 @@ export default async function handler(req, res) {
   if (req.method !== 'POST') return res.status(405).json({ error: 'Method not allowed' });
 
   try {
-    const { username, password } = req.body;
+    const { name, password } = req.body;
 
-    if (!username || !password) {
-      return res.status(400).json({ error: 'Username at password ay kailangan' });
+    if (!name || !password) {
+      return res.status(400).json({ error: 'Name at password ay kailangan' });
     }
 
     const { data: user, error } = await supabase
       .from('users')
       .select('*')
-      .eq('username', username)
+      .eq('name', name)
       .maybeSingle();
 
     if (error || !user) {
-      return res.status(401).json({ error: 'Maling username o password' });
+      return res.status(401).json({ error: 'Maling name o password' });
     }
 
     const valid = await bcrypt.compare(password, user.password);
     if (!valid) {
-      return res.status(401).json({ error: 'Maling username o password' });
+      return res.status(401).json({ error: 'Maling name o password' });
     }
 
     const token = jwt.sign(
-      { id: user.id, username: user.username, role: user.role },
+      { id: user.id, name: user.name, role: user.role },
       JWT_SECRET,
       { expiresIn: '7d' }
     );
@@ -50,7 +50,8 @@ export default async function handler(req, res) {
       token,
       user: {
         id: user.id,
-        username: user.username,
+        name: user.name,
+        gmail: user.gmail,
         role: user.role,
         age: user.age
       }
