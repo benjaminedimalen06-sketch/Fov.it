@@ -49,18 +49,17 @@ export default async function handler(req, res) {
     const { data, error } = await query;
     if (error) return res.status(500).json({ error: 'Failed to fetch scripts' });
 
-    // Kung owner, kunin din ang usernames
     let scripts = data;
     if (isOwner && data.length > 0) {
       const userIds = [...new Set(data.map(s => s.user_id))];
       const { data: users } = await supabase
         .from('users')
-        .select('id, username')
+        .select('id, name')
         .in('id', userIds);
       
       const userMap = {};
-      (users || []).forEach(u => { userMap[u.id] = u.username; });
-      scripts = data.map(s => ({ ...s, owner_username: userMap[s.user_id] || 'unknown' }));
+      (users || []).forEach(u => { userMap[u.id] = u.name; });
+      scripts = data.map(s => ({ ...s, owner_name: userMap[s.user_id] || 'unknown' }));
     }
 
     return res.status(200).json({ scripts });
@@ -93,7 +92,6 @@ export default async function handler(req, res) {
   // ===== PUT: I-edit ang script =====
   if (req.method === 'PUT') {
     const { id, title, content } = req.body;
-
     if (!id) return res.status(400).json({ error: 'Script ID kailangan' });
 
     const { data: existing } = await supabase
