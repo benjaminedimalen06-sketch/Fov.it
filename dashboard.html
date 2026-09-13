@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Fov.it — Dashboard</title>
+  <title>Fov.it — My Pastes</title>
   <style>
     * { margin: 0; padding: 0; box-sizing: border-box; }
     body { font-family: 'Segoe UI', sans-serif; background: #0a0a0a; color: #fff; min-height: 100vh; }
@@ -13,27 +13,24 @@
     .badge { background: #00ff88; color: #0a0a0a; padding: 3px 10px; border-radius: 12px; font-size: 11px; font-weight: bold; text-transform: uppercase; }
     .logout-btn { background: #222; color: #fff; border: none; padding: 8px 16px; border-radius: 6px; cursor: pointer; font-size: 13px; }
     .logout-btn:hover { background: #ff4444; }
-    .container { max-width: 1000px; margin: 0 auto; padding: 32px 24px; }
+    .container { max-width: 1100px; margin: 0 auto; padding: 32px 24px; }
     .header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 24px; }
     h1 { color: #fff; font-size: 24px; }
+    .new-btn { background: #00ff88; color: #0a0a0a; border: none; padding: 10px 20px; border-radius: 6px; font-weight: bold; cursor: pointer; font-size: 14px; text-decoration: none; }
+    .new-btn:hover { background: #00cc6a; }
     .owner-banner { background: #1a2a1a; border: 1px solid #00ff88; color: #00ff88; padding: 12px 16px; border-radius: 6px; margin-bottom: 20px; font-size: 13px; }
-    .upload-box { background: #141414; border: 1px solid #222; border-radius: 8px; padding: 24px; margin-bottom: 24px; }
-    .upload-box h2 { color: #00ff88; font-size: 16px; margin-bottom: 16px; }
-    .upload-box input, .upload-box textarea { width: 100%; padding: 10px; background: #0a0a0a; border: 1px solid #222; border-radius: 6px; color: #fff; font-size: 13px; outline: none; margin-bottom: 12px; font-family: inherit; }
-    .upload-box input:focus, .upload-box textarea:focus { border-color: #00ff88; }
-    .upload-box textarea { min-height: 150px; font-family: 'Consolas', 'Monaco', monospace; resize: vertical; }
-    .upload-btn { background: #00ff88; color: #0a0a0a; border: none; padding: 10px 20px; border-radius: 6px; font-weight: bold; cursor: pointer; font-size: 13px; }
-    .upload-btn:hover { background: #00cc6a; }
-    .upload-btn:disabled { background: #444; cursor: not-allowed; }
-    .raw-result { background: #0a2a0a; border: 1px solid #00ff88; color: #00ff88; padding: 12px; border-radius: 6px; margin-top: 12px; font-size: 12px; word-break: break-all; display: none; }
-    .raw-result code { color: #fff; background: #0a0a0a; padding: 4px 8px; border-radius: 4px; display: inline-block; margin-top: 6px; }
-    .script-card { background: #141414; border: 1px solid #222; border-radius: 8px; padding: 20px; margin-bottom: 12px; display: flex; justify-content: space-between; align-items: center; }
-    .script-card:hover { border-color: #00ff88; }
-    .script-info h3 { color: #fff; font-size: 16px; margin-bottom: 6px; }
-    .script-meta { color: #666; font-size: 12px; }
-    .script-meta span { color: #00ff88; }
-    .actions { display: flex; gap: 8px; flex-wrap: wrap; }
-    .btn { padding: 8px 14px; border-radius: 6px; border: none; cursor: pointer; font-size: 12px; font-weight: bold; }
+    
+    /* PASTEBIN STYLE TABLE */
+    .pastes-table { width: 100%; border-collapse: collapse; background: #141414; border-radius: 8px; overflow: hidden; }
+    .pastes-table thead { background: #1a1a1a; }
+    .pastes-table th { text-align: left; padding: 14px 16px; font-size: 12px; color: #00ff88; text-transform: uppercase; border-bottom: 1px solid #222; }
+    .pastes-table td { padding: 14px 16px; font-size: 13px; color: #ccc; border-bottom: 1px solid #1a1a1a; }
+    .pastes-table tbody tr:hover { background: #1a1a1a; }
+    .pastes-table .title { color: #00ff88; font-weight: bold; cursor: pointer; }
+    .pastes-table .title:hover { text-decoration: underline; }
+    .pastes-table .actions { display: flex; gap: 6px; flex-wrap: wrap; }
+    
+    .btn { padding: 6px 12px; border-radius: 4px; border: none; cursor: pointer; font-size: 11px; font-weight: bold; text-decoration: none; display: inline-block; }
     .btn-edit { background: #222; color: #00ff88; }
     .btn-edit:hover { background: #00ff88; color: #0a0a0a; }
     .btn-copy { background: #222; color: #fff; }
@@ -42,8 +39,17 @@
     .btn-raw:hover { background: #00cc6a; }
     .btn-delete { background: #222; color: #ff4444; }
     .btn-delete:hover { background: #ff4444; color: #fff; }
+    .btn-view { background: #222; color: #fff; }
+    .btn-view:hover { background: #444; }
+    
     .empty { text-align: center; color: #666; padding: 60px 20px; background: #141414; border: 1px dashed #222; border-radius: 8px; }
     .toast { position: fixed; bottom: 20px; right: 20px; background: #00ff88; color: #0a0a0a; padding: 12px 20px; border-radius: 6px; font-weight: bold; display: none; z-index: 999; }
+    
+    .raw-link-box { 
+      background: #0a2a0a; border: 1px solid #00ff88; color: #00ff88; 
+      padding: 10px 14px; border-radius: 6px; margin-top: 8px; 
+      font-size: 11px; word-break: break-all; font-family: 'Consolas', monospace;
+    }
   </style>
 </head>
 <body>
@@ -60,23 +66,18 @@
       👑 Ikaw ang OWNER — Makikita mo lahat ng scripts ng lahat ng users.
     </div>
 
-    <div class="upload-box">
-      <h2>📤 Upload Script (Raw Link)</h2>
-      <input type="text" id="uploadTitle" placeholder="Script Name (Title)">
-      <textarea id="uploadContent" placeholder="-- I-paste ang Lua script dito..."></textarea>
-      <button class="upload-btn" id="uploadBtn" onclick="uploadScript()">Upload & Get Raw Link</button>
-      <div class="raw-result" id="rawResult"></div>
+    <div class="header">
+      <h1>📋 My Pastes</h1>
+      <a href="/editor.html" class="new-btn">+ Bagong Script</a>
     </div>
 
-    <div class="header">
-      <h1 id="pageTitle">Aking Scripts</h1>
-    </div>
     <div id="scriptsList"></div>
   </div>
   <div class="toast" id="toast">Copied!</div>
 
   <script>
     const user = JSON.parse(localStorage.getItem('fov_user') || '{}');
+    if (!localStorage.getItem('fov_token')) window.location.href = '/';
 
     document.getElementById('username').textContent = user.name || '?';
     document.getElementById('roleBadge').textContent = user.role || 'user';
@@ -85,90 +86,66 @@
       document.getElementById('ownerBanner').style.display = 'block';
     }
 
-    async function uploadScript() {
-      const btn = document.getElementById('uploadBtn');
-      const title = document.getElementById('uploadTitle').value.trim();
-      const content = document.getElementById('uploadContent').value;
-
-      if (!title || !content) {
-        alert('Fill up title at content');
-        return;
-      }
-
-      btn.disabled = true;
-      btn.textContent = 'Uploading...';
+    async function loadScripts() {
+      const list = document.getElementById('scriptsList');
+      list.innerHTML = '<div class="empty">Loading...</div>';
 
       try {
-        const res = await fetch('/api/upload', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ title, content, owner: user.name })
-        });
+        const res = await fetch('/api/list');
         const data = await res.json();
         if (!res.ok) throw new Error(data.error);
 
-        // I-save sa localStorage para sa dashboard list
-        let scripts = JSON.parse(localStorage.getItem('fov_scripts') || '[]');
-        scripts.push({
-          id: 'id_' + Date.now(),
-          title: title,
-          content: content,
-          link: data.link,
-          owner: user.name,
-          created: new Date().toISOString()
-        });
-        localStorage.setItem('fov_scripts', JSON.stringify(scripts));
+        if (data.scripts.length === 0) {
+          list.innerHTML = '<div class="empty">Wala pang scripts. Click "+ Bagong Script" para gumawa.</div>';
+          return;
+        }
 
-        // Ipakita ang raw link
-        const rawResult = document.getElementById('rawResult');
-        rawResult.style.display = 'block';
-        rawResult.innerHTML = `
-          ✅ <strong>Script uploaded!</strong><br><br>
-          <strong>Raw Link:</strong><br>
-          <code>${data.raw_link}</code><br><br>
-          <strong>Para gamitin sa Roblox:</strong><br>
-          <code>loadstring(game:HttpGet("${data.raw_link}"))()</code>
+        list.innerHTML = `
+          <table class="pastes-table">
+            <thead>
+              <tr>
+                <th>Name / Title</th>
+                <th>Added</th>
+                <th>Raw Link</th>
+                <th>Actions</th>
+              </tr>
+            </thead>
+            <tbody>
+              ${data.scripts.map(s => {
+                const rawLink = window.location.origin + '/api/raw?id=' + s.public_link;
+                const viewLink = window.location.origin + '/s/' + s.public_link;
+                const date = new Date(s.created_at).toLocaleDateString('en-US', { 
+                  month: 'short', day: 'numeric', year: 'numeric' 
+                });
+                return `
+                  <tr>
+                    <td>
+                      <span class="title" onclick="window.open('${viewLink}', '_blank')">
+                        ${escapeHtml(s.title)}
+                      </span>
+                    </td>
+                    <td>${date}</td>
+                    <td>
+                      <div class="raw-link-box">/api/raw?id=${s.public_link}</div>
+                    </td>
+                    <td>
+                      <div class="actions">
+                        <button class="btn btn-raw" onclick="copyRaw('${rawLink}')">📋 Copy Raw</button>
+                        <a href="/editor.html?id=${s.id}" class="btn btn-edit">✏️ Edit</a>
+                        <button class="btn btn-copy" onclick="window.open('${viewLink}', '_blank')">👁️ View</button>
+                        <button class="btn btn-delete" onclick="deleteScript('${s.id}')">🗑️ Delete</button>
+                      </div>
+                    </td>
+                  </tr>
+                `;
+              }).join('')}
+            </tbody>
+          </table>
         `;
 
-        document.getElementById('uploadTitle').value = '';
-        document.getElementById('uploadContent').value = '';
-
-        showToast('Uploaded!');
-        loadScripts();
       } catch (err) {
-        alert('Error: ' + err.message);
-      } finally {
-        btn.disabled = false;
-        btn.textContent = 'Upload & Get Raw Link';
+        list.innerHTML = '<div class="empty">Error: ' + err.message + '</div>';
       }
-    }
-
-    function loadScripts() {
-      const scripts = JSON.parse(localStorage.getItem('fov_scripts') || '[]');
-      const list = document.getElementById('scriptsList');
-      if (scripts.length === 0) {
-        list.innerHTML = '<div class="empty">Wala pang scripts. Upload sa taas.</div>';
-        return;
-      }
-      list.innerHTML = scripts.map(s => {
-        const rawLink = window.location.origin + '/api/raw?id=' + s.link;
-        return `
-        <div class="script-card">
-          <div class="script-info">
-            <h3>${escapeHtml(s.title)}</h3>
-            <div class="script-meta">
-              May-ari: <span>${escapeHtml(s.owner || 'you')}</span> · 
-              Link: <span>/s/${s.link}</span>
-            </div>
-          </div>
-          <div class="actions">
-            <button class="btn btn-copy" onclick="copyLink('${s.link}')">Copy Link</button>
-            <button class="btn btn-raw" onclick="copyRaw('${rawLink}')">Copy Raw</button>
-            <button class="btn btn-edit" onclick="editScript('${s.id}')">Edit</button>
-            <button class="btn btn-delete" onclick="deleteScript('${s.id}')">Delete</button>
-          </div>
-        </div>
-      `}).join('');
     }
 
     function escapeHtml(text) {
@@ -177,35 +154,34 @@
       return div.innerHTML;
     }
 
-    function copyLink(link) {
-      const full = window.location.origin + '/s/' + link;
-      navigator.clipboard.writeText(full);
-      showToast('Link copied!');
-    }
-
     function copyRaw(rawLink) {
-      navigator.clipboard.writeText('loadstring(game:HttpGet("' + rawLink + '"))()');
-      showToast('Raw loadstring copied!');
+      const loadstring = `loadstring(game:HttpGet("${rawLink}"))()`;
+      navigator.clipboard.writeText(loadstring);
+      showToast('Copied: ' + loadstring);
     }
 
-    function editScript(id) {
-      window.location.href = '/editor.html?id=' + id;
-    }
-
-    function deleteScript(id) {
-      if (!confirm('Burahin?')) return;
-      let scripts = JSON.parse(localStorage.getItem('fov_scripts') || '[]');
-      scripts = scripts.filter(s => s.id !== id);
-      localStorage.setItem('fov_scripts', JSON.stringify(scripts));
-      loadScripts();
-      showToast('Deleted!');
+    async function deleteScript(id) {
+      if (!confirm('Sigurado ka bang gusto mong burahin ito?')) return;
+      try {
+        const res = await fetch('/api/delete', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ id })
+        });
+        const data = await res.json();
+        if (!res.ok) throw new Error(data.error);
+        showToast('Deleted!');
+        loadScripts();
+      } catch (err) {
+        alert('Error: ' + err.message);
+      }
     }
 
     function showToast(msg) {
       const t = document.getElementById('toast');
       t.textContent = msg;
       t.style.display = 'block';
-      setTimeout(() => t.style.display = 'none', 2500);
+      setTimeout(() => t.style.display = 'none', 3000);
     }
 
     function logout() {
