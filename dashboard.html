@@ -147,7 +147,7 @@
 
     if (!token) window.location.href = '/';
 
-    document.getElementById('username').textContent = user.username || '?';
+    document.getElementById('username').textContent = user.name || '?';
     document.getElementById('roleBadge').textContent = user.role || 'user';
 
     if (user.role === 'owner') {
@@ -183,7 +183,7 @@
           <div class="script-info">
             <h3>${escapeHtml(s.title)}</h3>
             <div class="script-meta">
-              ${s.owner_username ? 'May-ari: <span>' + escapeHtml(s.owner_username) + '</span> · ' : ''}
+              ${s.owner_name ? 'May-ari: <span>' + escapeHtml(s.owner_name) + '</span> · ' : ''}
               Link: <span>/s/${s.public_link}</span> · Updated: ${new Date(s.updated_at).toLocaleString()}
             </div>
           </div>
