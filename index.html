@@ -32,36 +32,72 @@
       font-weight: bold; cursor: pointer;
     }
     button:hover { background: #00cc6a; }
+    button:disabled { background: #444; cursor: not-allowed; }
     .link { text-align: center; margin-top: 20px; color: #666; font-size: 13px; }
     .link a { color: #00ff88; text-decoration: none; }
+    .error {
+      background: #2a0a0a; border: 1px solid #ff4444; color: #ff6666;
+      padding: 10px; border-radius: 6px; margin-bottom: 18px;
+      font-size: 13px; display: none;
+    }
   </style>
 </head>
 <body>
   <div class="container">
     <h1>Fov.it</h1>
     <p class="subtitle">Script Protection System</p>
+    <div class="error" id="error"></div>
     <form id="loginForm">
       <label>Name</label>
-      <input type="text" id="name" required>
+      <input type="text" id="name" required autocomplete="username">
       <label>Password</label>
-      <input type="password" id="password" required>
-      <button type="submit">Login</button>
+      <input type="password" id="password" required autocomplete="current-password">
+      <button type="submit" id="submitBtn">Login</button>
     </form>
     <p class="link">Wala pang account? <a href="/register.html">Register</a></p>
   </div>
   <script>
     if (localStorage.getItem('fov_token')) window.location.href = '/dashboard.html';
+    
     document.getElementById('loginForm').addEventListener('submit', (e) => {
       e.preventDefault();
+      const errorBox = document.getElementById('error');
+      errorBox.style.display = 'none';
+      
       const name = document.getElementById('name').value.trim();
       const password = document.getElementById('password').value;
-      if (!name || !password) return alert('Fill up lahat');
-      // Accept kahit ano
+      
+      if (!name || !password) {
+        errorBox.textContent = 'Fill up lahat';
+        errorBox.style.display = 'block';
+        return;
+      }
+      
+      // Kunin ang listahan ng users
+      const users = JSON.parse(localStorage.getItem('fov_users') || '[]');
+      const user = users.find(u => u.name === name);
+      
+      if (!user) {
+        errorBox.textContent = 'Maling name o password';
+        errorBox.style.display = 'block';
+        return;
+      }
+      
+      // I-verify ang password
+      if (user.password !== password) {
+        errorBox.textContent = 'Maling name o password';
+        errorBox.style.display = 'block';
+        return;
+      }
+      
+      // Success
       localStorage.setItem('fov_token', 'token_' + Date.now());
       localStorage.setItem('fov_user', JSON.stringify({
-        name: name,
-        role: name === 'Zyrox' ? 'owner' : 'user'
+        name: user.name,
+        gmail: user.gmail,
+        role: user.role
       }));
+      
       window.location.href = '/dashboard.html';
     });
   </script>
