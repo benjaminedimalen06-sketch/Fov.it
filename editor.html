@@ -9,7 +9,7 @@
     body { font-family: 'Segoe UI', sans-serif; background: #0a0a0a; color: #fff; min-height: 100vh; }
     .navbar { background: #141414; border-bottom: 1px solid #222; padding: 16px 24px; display: flex; justify-content: space-between; align-items: center; }
     .logo { color: #00ff88; font-size: 20px; font-weight: bold; }
-    .back-btn { background: #222; color: #fff; border: none; padding: 8px 16px; border-radius: 6px; cursor: pointer; font-size: 13px; }
+    .back-btn { background: #222; color: #fff; border: none; padding: 8px 16px; border-radius: 6px; cursor: pointer; font-size: 13px; text-decoration: none; }
     .back-btn:hover { background: #333; }
     .container { max-width: 900px; margin: 0 auto; padding: 32px 24px; }
     h1 { color: #fff; font-size: 24px; margin-bottom: 24px; }
@@ -18,77 +18,132 @@
     input:focus, textarea:focus { border-color: #00ff88; }
     input { margin-bottom: 18px; }
     textarea { min-height: 400px; font-family: 'Consolas', 'Monaco', monospace; font-size: 13px; line-height: 1.6; resize: vertical; margin-bottom: 18px; }
-    .actions { display: flex; gap: 12px; }
+    .actions { display: flex; gap: 12px; flex-wrap: wrap; }
     button { padding: 12px 24px; border: none; border-radius: 6px; font-size: 14px; font-weight: bold; cursor: pointer; }
     .btn-save { background: #00ff88; color: #0a0a0a; }
     .btn-save:hover { background: #00cc6a; }
+    .btn-save:disabled { background: #444; cursor: not-allowed; }
     .btn-cancel { background: #222; color: #fff; }
     .btn-cancel:hover { background: #333; }
+    .btn-raw { background: #222; color: #00ff88; }
+    .btn-raw:hover { background: #00ff88; color: #0a0a0a; }
     .toast { position: fixed; bottom: 20px; right: 20px; background: #00ff88; color: #0a0a0a; padding: 12px 20px; border-radius: 6px; font-weight: bold; display: none; z-index: 999; }
+    .error { background: #2a0a0a; border: 1px solid #ff4444; color: #ff6666; padding: 10px; border-radius: 6px; margin-bottom: 18px; font-size: 13px; display: none; }
+    .raw-link-box { background: #0a2a0a; border: 1px solid #00ff88; color: #00ff88; padding: 12px; border-radius: 6px; margin-bottom: 18px; font-size: 12px; word-break: break-all; display: none; font-family: 'Consolas', monospace; }
+    .raw-link-box code { color: #fff; background: #0a0a0a; padding: 4px 8px; border-radius: 4px; display: inline-block; margin-top: 6px; }
   </style>
 </head>
 <body>
   <div class="navbar">
     <div class="logo">Fov.it</div>
-    <button class="back-btn" onclick="window.location.href='/dashboard.html'">← Back</button>
+    <a href="/dashboard.html" class="back-btn">← Back</a>
   </div>
   <div class="container">
     <h1 id="pageTitle">Bagong Script</h1>
+    <div class="error" id="error"></div>
+    <div class="raw-link-box" id="rawBox"></div>
+
     <form id="editorForm">
-      <label>Title</label>
+      <label>Script Name (Title)</label>
       <input type="text" id="title" required placeholder="Pangalan ng script">
       <label>Script Content (Lua)</label>
       <textarea id="content" required placeholder="-- I-paste ang Lua script dito..."></textarea>
       <div class="actions">
-        <button type="submit" class="btn-save">I-save</button>
-        <button type="button" class="btn-cancel" onclick="window.location.href='/dashboard.html'">Cancel</button>
+        <button type="submit" class="btn-save" id="saveBtn">💾 I-save</button>
+        <a href="/dashboard.html" class="btn-cancel">Cancel</a>
       </div>
     </form>
   </div>
   <div class="toast" id="toast">Saved!</div>
+
   <script>
-    const token = localStorage.getItem('fov_token');
-    const user = JSON.parse(localStorage.getItem('fov_user') || '{}');
-    if (!token) window.location.href = '/';
+    if (!localStorage.getItem('fov_token')) window.location.href = '/';
 
     const params = new URLSearchParams(window.location.search);
     const editId = params.get('id');
-    let scripts = JSON.parse(localStorage.getItem('fov_scripts') || '[]');
 
     if (editId) {
       document.getElementById('pageTitle').textContent = 'I-edit ang Script';
-      const script = scripts.find(s => s.id === editId);
-      if (script) {
-        document.getElementById('title').value = script.title;
-        document.getElementById('content').value = script.content;
+      loadScript(editId);
+    }
+
+    async function loadScript(id) {
+      try {
+        const res = await fetch('/api/single?id=' + id);
+        const data = await res.json();
+        if (!res.ok) throw new Error(data.error);
+        
+        document.getElementById('title').value = data.script.title;
+        document.getElementById('content').value = data.script.content;
+
+        // Ipakita ang raw link
+        const rawLink = window.location.origin + '/api/raw?id=' + data.script.public_link;
+        const rawBox = document.getElementById('rawBox');
+        rawBox.style.display = 'block';
+        rawBox.innerHTML = `
+          <strong>📋 Raw Link:</strong><br>
+          <code>${rawLink}</code><br><br>
+          <strong>Para gamitin sa Roblox:</strong><br>
+          <code>loadstring(game:HttpGet("${rawLink}"))()</code>
+        `;
+      } catch (err) {
+        document.getElementById('error').textContent = err.message;
+        document.getElementById('error').style.display = 'block';
       }
     }
 
-    document.getElementById('editorForm').addEventListener('submit', (e) => {
+    document.getElementById('editorForm').addEventListener('submit', async (e) => {
       e.preventDefault();
+      const btn = document.getElementById('saveBtn');
+      const errorBox = document.getElementById('error');
+      btn.disabled = true;
+      btn.textContent = 'Saving...';
+      errorBox.style.display = 'none';
+
       const title = document.getElementById('title').value.trim();
       const content = document.getElementById('content').value;
 
-      if (editId) {
-        const script = scripts.find(s => s.id === editId);
-        if (script) {
-          script.title = title;
-          script.content = content;
+      try {
+        let res;
+        if (editId) {
+          res = await fetch('/api/edit', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ id: editId, title, content })
+          });
+        } else {
+          res = await fetch('/api/upload', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ title, content })
+          });
         }
-      } else {
-        scripts.push({
-          id: 'id_' + Date.now(),
-          title: title,
-          content: content,
-          link: Math.random().toString(36).substring(2, 12),
-          owner: user.name || 'you',
-          created: new Date().toISOString()
-        });
-      }
 
-      localStorage.setItem('fov_scripts', JSON.stringify(scripts));
-      showToast(editId ? 'Updated!' : 'Created!');
-      setTimeout(() => window.location.href = '/dashboard.html', 1000);
+        const data = await res.json();
+        if (!res.ok) throw new Error(data.error || 'Failed to save');
+
+        // Ipakita ang raw link
+        if (data.script && data.script.public_link) {
+          const rawLink = window.location.origin + '/api/raw?id=' + data.script.public_link;
+          const rawBox = document.getElementById('rawBox');
+          rawBox.style.display = 'block';
+          rawBox.innerHTML = `
+            ✅ <strong>Saved!</strong><br><br>
+            <strong>📋 Raw Link:</strong><br>
+            <code>${rawLink}</code><br><br>
+            <strong>Para gamitin sa Roblox:</strong><br>
+            <code>loadstring(game:HttpGet("${rawLink}"))()</code>
+          `;
+        }
+
+        showToast(editId ? 'Updated!' : 'Created!');
+        setTimeout(() => window.location.href = '/dashboard.html', 2000);
+      } catch (err) {
+        errorBox.textContent = err.message;
+        errorBox.style.display = 'block';
+        btn.disabled = false;
+        btn.textContent = '💾 I-save';
+      }
     });
 
     function showToast(msg) {
