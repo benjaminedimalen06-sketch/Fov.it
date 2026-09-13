@@ -48,8 +48,8 @@
     <p class="subtitle">Script Protection System</p>
     <div class="error" id="error"></div>
     <form id="loginForm">
-      <label>Username</label>
-      <input type="text" id="username" required autocomplete="username">
+      <label>Name</label>
+      <input type="text" id="name" required autocomplete="username">
       <label>Password</label>
       <input type="password" id="password" required autocomplete="current-password">
       <button type="submit" id="submitBtn">Login</button>
@@ -69,7 +69,7 @@
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({
-            username: document.getElementById('username').value.trim(),
+            name: document.getElementById('name').value.trim(),
             password: document.getElementById('password').value
           })
         });
