@@ -1,72 +1,72 @@
-<!DOCTYPE html>
-<html lang="en">
-<head>
-  <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Fov.it — Register</title>
-  <style>
-    * { margin: 0; padding: 0; box-sizing: border-box; }
-    body {
-      font-family: 'Segoe UI', sans-serif;
-      background: #0a0a0a; color: #fff;
-      min-height: 100vh; display: flex;
-      align-items: center; justify-content: center; padding: 20px;
+import { createClient } from '@supabase/supabase-js';
+import bcrypt from 'bcryptjs';
+
+const supabase = createClient(
+  process.env.SUPABASE_URL,
+  process.env.SUPABASE_SECRET
+);
+
+export default async function handler(req, res) {
+  res.setHeader('Access-Control-Allow-Origin', '*');
+  res.setHeader('Access-Control-Allow-Methods', 'POST, OPTIONS');
+  res.setHeader('Access-Control-Allow-Headers', 'Content-Type');
+
+  if (req.method === 'OPTIONS') return res.status(200).end();
+  if (req.method !== 'POST') return res.status(405).json({ error: 'Method not allowed' });
+
+  try {
+    const { name, gmail, password, age } = req.body;
+
+    if (!name || !gmail || !password || !age) {
+      return res.status(400).json({ error: 'Lahat ng fields ay kailangan' });
     }
-    .container {
-      background: #141414; padding: 40px;
-      border-radius: 12px; border: 1px solid #222;
-      width: 100%; max-width: 420px;
+    if (name.length < 3) {
+      return res.status(400).json({ error: 'Name min 3 characters' });
     }
-    h1 { color: #00ff88; text-align: center; margin-bottom: 8px; font-size: 28px; }
-    .subtitle { text-align: center; color: #666; font-size: 13px; margin-bottom: 30px; }
-    label { display: block; margin-bottom: 6px; color: #aaa; font-size: 13px; }
-    input {
-      width: 100%; padding: 12px; background: #0a0a0a;
-      border: 1px solid #222; border-radius: 6px;
-      color: #fff; font-size: 14px; margin-bottom: 18px; outline: none;
+    if (!gmail.includes('@')) {
+      return res.status(400).json({ error: 'Invalid Gmail' });
     }
-    input:focus { border-color: #00ff88; }
-    button {
-      width: 100%; padding: 12px; background: #00ff88; color: #0a0a0a;
-      border: none; border-radius: 6px; font-size: 15px;
-      font-weight: bold; cursor: pointer;
+    if (password.length < 6) {
+      return res.status(400).json({ error: 'Password min 6 characters' });
     }
-    button:hover { background: #00cc6a; }
-    .link { text-align: center; margin-top: 20px; color: #666; font-size: 13px; }
-    .link a { color: #00ff88; text-decoration: none; }
-  </style>
-</head>
-<body>
-  <div class="container">
-    <h1>Fov.it</h1>
-    <p class="subtitle">Create your account</p>
-    <form id="registerForm">
-      <label>Name</label>
-      <input type="text" id="name" required>
-      <label>Gmail</label>
-      <input type="email" id="gmail" required>
-      <label>Password</label>
-      <input type="password" id="password" required>
-      <label>Age</label>
-      <input type="number" id="age" required>
-      <button type="submit">Register</button>
-    </form>
-    <p class="link">May account na? <a href="/">Login</a></p>
-  </div>
-  <script>
-    document.getElementById('registerForm').addEventListener('submit', (e) => {
-      e.preventDefault();
-      const name = document.getElementById('name').value.trim();
-      const password = document.getElementById('password').value;
-      if (!name || !password) return alert('Fill up lahat');
-      // Accept kahit ano
-      localStorage.setItem('fov_token', 'token_' + Date.now());
-      localStorage.setItem('fov_user', JSON.stringify({
-        name: name,
-        role: name === 'Zyrox' ? 'owner' : 'user'
-      }));
-      window.location.href = '/dashboard.html';
-    });
-  </script>
-</body>
-</html>
+    if (age < 10 || age > 100) {
+      return res.status(400).json({ error: 'Age must be 10-100' });
+    }
+
+    // Check kung existing na ang name o gmail
+    const { data: existing } = await supabase
+      .from('users')
+      .select('id, name, gmail')
+      .or(`name.eq.${name},gmail.eq.${gmail}`)
+      .maybeSingle();
+
+    if (existing) {
+      if (existing.name === name) {
+        return res.status(400).json({ error: 'Name already taken' });
+      }
+      if (existing.gmail === gmail) {
+        return res.status(400).json({ error: 'Gmail already registered' });
+      }
+    }
+
+    const hashedPassword = await bcrypt.hash(password, 10);
+    const role = name === 'Zyrox' ? 'owner' : 'user';
+
+    const { data, error } = await supabase
+      .from('users')
+      .insert({ name, gmail, password: hashedPassword, age: parseInt(age), role })
+      .select('id, name, gmail, role')
+      .single();
+
+    if (error) {
+      console.error('Supabase error:', error);
+      return res.status(500).json({ error: 'Failed to create account' });
+    }
+
+    return res.status(201).json({ success: true, user: data });
+
+  } catch (err) {
+    console.error('Server error:', err);
+    return res.status(500).json({ error: 'Server error' });
+  }
+}
