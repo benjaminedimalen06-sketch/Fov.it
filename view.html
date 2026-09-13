@@ -1,0 +1,113 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Fov.it — Script</title>
+  <style>
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+    body {
+      font-family: 'Segoe UI', sans-serif;
+      background: #0a0a0a; color: #fff;
+      min-height: 100vh;
+      display: flex; align-items: center; justify-content: center;
+      padding: 20px;
+    }
+    .container {
+      background: #141414; padding: 40px;
+      border-radius: 12px; border: 1px solid #222;
+      width: 100%; max-width: 800px;
+    }
+    .logo { color: #00ff88; font-size: 20px; font-weight: bold; text-align: center; margin-bottom: 8px; }
+    .subtitle { text-align: center; color: #666; font-size: 12px; margin-bottom: 30px; }
+    h1 { color: #fff; font-size: 22px; margin-bottom: 20px; text-align: center; }
+    .protected-box {
+      background: #1a0a0a; border: 2px solid #ff4444;
+      color: #ff6666; padding: 40px 20px;
+      border-radius: 8px; text-align: center;
+    }
+    .protected-box .lock { font-size: 48px; margin-bottom: 16px; }
+    .protected-box .msg { font-size: 18px; font-weight: bold; margin-bottom: 8px; }
+    .protected-box .desc { font-size: 13px; color: #aa6666; }
+    pre {
+      background: #0a0a0a; border: 1px solid #222;
+      padding: 20px; border-radius: 8px;
+      font-family: 'Consolas', 'Monaco', monospace;
+      font-size: 13px; line-height: 1.6;
+      overflow-x: auto; white-space: pre-wrap;
+      word-wrap: break-word;
+      max-height: 500px; overflow-y: auto;
+    }
+    .meta {
+      text-align: center; color: #666; font-size: 12px;
+      margin-top: 20px; padding-top: 20px;
+      border-top: 1px solid #222;
+    }
+    .meta a { color: #00ff88; text-decoration: none; }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <div class="logo">Fov.it</div>
+    <div class="subtitle">Script Protection System</div>
+
+    <h1 id="title">Loading...</h1>
+    <div id="contentArea"></div>
+
+    <div class="meta">
+      Protektado ng <a href="/">Fov.it</a>
+    </div>
+  </div>
+
+  <script>
+    const token = localStorage.getItem('fov_token');
+    const path = window.location.pathname;
+    const link = path.split('/s/')[1];
+
+    if (!link) {
+      document.getElementById('title').textContent = 'Invalid Link';
+      document.getElementById('contentArea').innerHTML =
+        '<div class="protected-box"><div class="lock">⚠️</div><div class="msg">Walang link</div></div>';
+    } else {
+      loadScript(link);
+    }
+
+    async function loadScript(link) {
+      try {
+        const headers = {};
+        if (token) headers['Authorization'] = 'Bearer ' + token;
+
+        const res = await fetch('/api/get?link=' + link, { headers });
+        const data = await res.json();
+
+        if (!res.ok) throw new Error(data.error || 'Script not found');
+
+        document.getElementById('title').textContent = data.title || 'Untitled';
+
+        if (data.protected) {
+          document.getElementById('contentArea').innerHTML = `
+            <div class="protected-box">
+              <div class="lock">🔒</div>
+              <div class="msg">This script is in protection</div>
+              <div class="desc">Hindi mo maaaring makita ang script na ito. Kailangan mong mag-login bilang may-ari.</div>
+            </div>
+          `;
+        } else {
+          document.getElementById('contentArea').innerHTML =
+            '<pre>' + escapeHtml(data.content) + '</pre>';
+        }
+      } catch (err) {
+        document.getElementById('title').textContent = 'Error';
+        document.getElementById('contentArea').innerHTML =
+          '<div class="protected-box"><div class="lock">❌</div><div class="msg">' + err.message + '</div></div>';
+      }
+    }
+
+    function escapeHtml(text) {
+      const div = document.createElement('div');
+      div.textContent = text;
+      return div.innerHTML;
+    }
+  </script>
+</body>
+</html>
