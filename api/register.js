@@ -15,13 +15,16 @@ export default async function handler(req, res) {
   if (req.method !== 'POST') return res.status(405).json({ error: 'Method not allowed' });
 
   try {
-    const { username, password, age } = req.body;
+    const { name, gmail, password, age } = req.body;
 
-    if (!username || !password || !age) {
+    if (!name || !gmail || !password || !age) {
       return res.status(400).json({ error: 'Lahat ng fields ay kailangan' });
     }
-    if (username.length < 3) {
-      return res.status(400).json({ error: 'Username min 3 characters' });
+    if (name.length < 3) {
+      return res.status(400).json({ error: 'Name min 3 characters' });
+    }
+    if (!gmail.includes('@')) {
+      return res.status(400).json({ error: 'Invalid Gmail' });
     }
     if (password.length < 6) {
       return res.status(400).json({ error: 'Password min 6 characters' });
@@ -31,19 +34,27 @@ export default async function handler(req, res) {
     }
 
     const { data: existing } = await supabase
-      .from('users').select('id').eq('username', username).maybeSingle();
+      .from('users')
+      .select('id, name, gmail')
+      .or(`name.eq.${name},gmail.eq.${gmail}`)
+      .maybeSingle();
 
     if (existing) {
-      return res.status(400).json({ error: 'Username already taken' });
+      if (existing.name === name) {
+        return res.status(400).json({ error: 'Name already taken' });
+      }
+      if (existing.gmail === gmail) {
+        return res.status(400).json({ error: 'Gmail already registered' });
+      }
     }
 
     const hashedPassword = await bcrypt.hash(password, 10);
-    const role = username === 'Zyrox' ? 'owner' : 'user';
+    const role = name === 'Zyrox' ? 'owner' : 'user';
 
     const { data, error } = await supabase
       .from('users')
-      .insert({ username, password: hashedPassword, age: parseInt(age), role })
-      .select('id, username, role')
+      .insert({ name, gmail, password: hashedPassword, age: parseInt(age), role })
+      .select('id, name, gmail, role')
       .single();
 
     if (error) {
