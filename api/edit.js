@@ -33,13 +33,13 @@ export default async function handler(req, res) {
 
     if (error) {
       console.error('Supabase error:', error);
-      return res.status(500).json({ error: 'Failed to update script' });
+      return res.status(500).json({ error: 'Failed to update: ' + error.message });
     }
 
     return res.status(200).json({ success: true, script: data });
 
   } catch (err) {
     console.error('Server error:', err);
-    return res.status(500).json({ error: 'Server error' });
+    return res.status(500).json({ error: 'Server error: ' + err.message });
   }
 }
