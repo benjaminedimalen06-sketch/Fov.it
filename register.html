@@ -55,8 +55,11 @@
     <div class="error" id="error"></div>
     <div class="success" id="success"></div>
     <form id="registerForm">
-      <label>Username</label>
-      <input type="text" id="username" required minlength="3" autocomplete="username">
+      <label>Name</label>
+      <input type="text" id="name" required minlength="3" autocomplete="name">
+      
+      <label>Gmail</label>
+      <input type="email" id="gmail" required autocomplete="email">
       
       <label>Password</label>
       <input type="password" id="password" required minlength="6" autocomplete="new-password">
@@ -83,7 +86,8 @@
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({
-            username: document.getElementById('username').value.trim(),
+            name: document.getElementById('name').value.trim(),
+            gmail: document.getElementById('gmail').value.trim(),
             password: document.getElementById('password').value,
             age: parseInt(document.getElementById('age').value)
           })
