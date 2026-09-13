@@ -32,40 +32,111 @@
       font-weight: bold; cursor: pointer;
     }
     button:hover { background: #00cc6a; }
+    button:disabled { background: #444; cursor: not-allowed; }
     .link { text-align: center; margin-top: 20px; color: #666; font-size: 13px; }
     .link a { color: #00ff88; text-decoration: none; }
+    .error {
+      background: #2a0a0a; border: 1px solid #ff4444; color: #ff6666;
+      padding: 10px; border-radius: 6px; margin-bottom: 18px;
+      font-size: 13px; display: none;
+    }
+    .success {
+      background: #0a2a0a; border: 1px solid #00ff88; color: #00ff88;
+      padding: 10px; border-radius: 6px; margin-bottom: 18px;
+      font-size: 13px; display: none;
+    }
+    .hint { color: #555; font-size: 11px; margin-top: -12px; margin-bottom: 16px; }
   </style>
 </head>
 <body>
   <div class="container">
     <h1>Fov.it</h1>
     <p class="subtitle">Create your account</p>
+    <div class="error" id="error"></div>
+    <div class="success" id="success"></div>
     <form id="registerForm">
       <label>Name</label>
-      <input type="text" id="name" required>
+      <input type="text" id="name" required minlength="3" autocomplete="name">
+      
       <label>Gmail</label>
-      <input type="email" id="gmail" required>
+      <input type="email" id="gmail" required autocomplete="email">
+      
       <label>Password</label>
-      <input type="password" id="password" required>
+      <input type="password" id="password" required minlength="6" autocomplete="new-password">
+      <p class="hint">Minimum 6 characters</p>
+      
       <label>Age</label>
-      <input type="number" id="age" required>
-      <button type="submit">Register</button>
+      <input type="number" id="age" required min="10" max="100">
+      
+      <button type="submit" id="submitBtn">Register</button>
     </form>
     <p class="link">May account na? <a href="/">Login</a></p>
   </div>
   <script>
     document.getElementById('registerForm').addEventListener('submit', (e) => {
       e.preventDefault();
+      const errorBox = document.getElementById('error');
+      const successBox = document.getElementById('success');
+      errorBox.style.display = 'none';
+      successBox.style.display = 'none';
+      
       const name = document.getElementById('name').value.trim();
+      const gmail = document.getElementById('gmail').value.trim();
       const password = document.getElementById('password').value;
-      if (!name || !password) return alert('Fill up lahat');
-      // Accept kahit ano
-      localStorage.setItem('fov_token', 'token_' + Date.now());
-      localStorage.setItem('fov_user', JSON.stringify({
+      const age = parseInt(document.getElementById('age').value);
+      
+      if (name.length < 3) {
+        errorBox.textContent = 'Name min 3 characters';
+        errorBox.style.display = 'block';
+        return;
+      }
+      if (!gmail.includes('@')) {
+        errorBox.textContent = 'Invalid Gmail';
+        errorBox.style.display = 'block';
+        return;
+      }
+      if (password.length < 6) {
+        errorBox.textContent = 'Password min 6 characters';
+        errorBox.style.display = 'block';
+        return;
+      }
+      if (age < 10 || age > 100) {
+        errorBox.textContent = 'Age must be 10-100';
+        errorBox.style.display = 'block';
+        return;
+      }
+      
+      // Kunin ang users
+      let users = JSON.parse(localStorage.getItem('fov_users') || '[]');
+      
+      // Check kung existing
+      if (users.find(u => u.name === name)) {
+        errorBox.textContent = 'Name already taken';
+        errorBox.style.display = 'block';
+        return;
+      }
+      if (users.find(u => u.gmail === gmail)) {
+        errorBox.textContent = 'Gmail already registered';
+        errorBox.style.display = 'block';
+        return;
+      }
+      
+      // I-save ang user
+      users.push({
         name: name,
-        role: name === 'Zyrox' ? 'owner' : 'user'
-      }));
-      window.location.href = '/dashboard.html';
+        gmail: gmail,
+        password: password,
+        age: age,
+        role: name === 'Zyrox' ? 'owner' : 'user',
+        created: new Date().toISOString()
+      });
+      
+      localStorage.setItem('fov_users', JSON.stringify(users));
+      
+      successBox.textContent = 'Account created! Redirecting to login...';
+      successBox.style.display = 'block';
+      
+      setTimeout(() => window.location.href = '/', 1500);
     });
   </script>
 </body>
