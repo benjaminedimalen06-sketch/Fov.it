@@ -23,10 +23,8 @@
     .btn-save { background: #00ff88; color: #0a0a0a; }
     .btn-save:hover { background: #00cc6a; }
     .btn-save:disabled { background: #444; cursor: not-allowed; }
-    .btn-cancel { background: #222; color: #fff; }
+    .btn-cancel { background: #222; color: #fff; padding: 12px 24px; border-radius: 6px; text-decoration: none; font-size: 14px; font-weight: bold; }
     .btn-cancel:hover { background: #333; }
-    .btn-raw { background: #222; color: #00ff88; }
-    .btn-raw:hover { background: #00ff88; color: #0a0a0a; }
     .toast { position: fixed; bottom: 20px; right: 20px; background: #00ff88; color: #0a0a0a; padding: 12px 20px; border-radius: 6px; font-weight: bold; display: none; z-index: 999; }
     .error { background: #2a0a0a; border: 1px solid #ff4444; color: #ff6666; padding: 10px; border-radius: 6px; margin-bottom: 18px; font-size: 13px; display: none; }
     .raw-link-box { background: #0a2a0a; border: 1px solid #00ff88; color: #00ff88; padding: 12px; border-radius: 6px; margin-bottom: 18px; font-size: 12px; word-break: break-all; display: none; font-family: 'Consolas', monospace; }
@@ -57,8 +55,6 @@
   <div class="toast" id="toast">Saved!</div>
 
   <script>
-    if (!localStorage.getItem('fov_token')) window.location.href = '/';
-
     const params = new URLSearchParams(window.location.search);
     const editId = params.get('id');
 
@@ -76,7 +72,6 @@
         document.getElementById('title').value = data.script.title;
         document.getElementById('content').value = data.script.content;
 
-        // Ipakita ang raw link
         const rawLink = window.location.origin + '/api/raw?id=' + data.script.public_link;
         const rawBox = document.getElementById('rawBox');
         rawBox.style.display = 'block';
@@ -122,7 +117,6 @@
         const data = await res.json();
         if (!res.ok) throw new Error(data.error || 'Failed to save');
 
-        // Ipakita ang raw link
         if (data.script && data.script.public_link) {
           const rawLink = window.location.origin + '/api/raw?id=' + data.script.public_link;
           const rawBox = document.getElementById('rawBox');
