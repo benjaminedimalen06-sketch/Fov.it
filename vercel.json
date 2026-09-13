@@ -1,5 +1,12 @@
 {
+  "version": 2,
   "rewrites": [
     { "source": "/s/:link", "destination": "/view.html" }
-  ]
+  ],
+  "functions": {
+    "api/*.js": {
+      "memory": 1024,
+      "maxDuration": 10
+    }
+  }
 }
