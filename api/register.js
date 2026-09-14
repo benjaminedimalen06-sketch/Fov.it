@@ -33,7 +33,7 @@ export default async function handler(req, res) {
       return res.status(400).json({ error: 'Age must be 10-100' });
     }
 
-    // Check kung existing na ang name o gmail
+    // Check kung existing
     const { data: existing } = await supabase
       .from('users')
       .select('id, name, gmail')
@@ -60,13 +60,13 @@ export default async function handler(req, res) {
 
     if (error) {
       console.error('Supabase error:', error);
-      return res.status(500).json({ error: 'Failed to create account' });
+      return res.status(500).json({ error: 'Failed to create account: ' + error.message });
     }
 
     return res.status(201).json({ success: true, user: data });
 
   } catch (err) {
     console.error('Server error:', err);
-    return res.status(500).json({ error: 'Server error' });
+    return res.status(500).json({ error: 'Server error: ' + err.message });
   }
 }
