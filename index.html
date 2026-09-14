@@ -6,40 +6,19 @@
   <title>Fov.it — Login</title>
   <style>
     * { margin: 0; padding: 0; box-sizing: border-box; }
-    body {
-      font-family: 'Segoe UI', sans-serif;
-      background: #0a0a0a; color: #fff;
-      min-height: 100vh; display: flex;
-      align-items: center; justify-content: center;
-    }
-    .container {
-      background: #141414; padding: 40px;
-      border-radius: 12px; border: 1px solid #222;
-      width: 100%; max-width: 400px;
-    }
+    body { font-family: 'Segoe UI', sans-serif; background: #0a0a0a; color: #fff; min-height: 100vh; display: flex; align-items: center; justify-content: center; }
+    .container { background: #141414; padding: 40px; border-radius: 12px; border: 1px solid #222; width: 100%; max-width: 400px; }
     h1 { color: #00ff88; text-align: center; margin-bottom: 8px; font-size: 28px; }
     .subtitle { text-align: center; color: #666; font-size: 13px; margin-bottom: 30px; }
     label { display: block; margin-bottom: 6px; color: #aaa; font-size: 13px; }
-    input {
-      width: 100%; padding: 12px; background: #0a0a0a;
-      border: 1px solid #222; border-radius: 6px;
-      color: #fff; font-size: 14px; margin-bottom: 18px; outline: none;
-    }
+    input { width: 100%; padding: 12px; background: #0a0a0a; border: 1px solid #222; border-radius: 6px; color: #fff; font-size: 14px; margin-bottom: 18px; outline: none; }
     input:focus { border-color: #00ff88; }
-    button {
-      width: 100%; padding: 12px; background: #00ff88; color: #0a0a0a;
-      border: none; border-radius: 6px; font-size: 15px;
-      font-weight: bold; cursor: pointer;
-    }
+    button { width: 100%; padding: 12px; background: #00ff88; color: #0a0a0a; border: none; border-radius: 6px; font-size: 15px; font-weight: bold; cursor: pointer; }
     button:hover { background: #00cc6a; }
     button:disabled { background: #444; cursor: not-allowed; }
     .link { text-align: center; margin-top: 20px; color: #666; font-size: 13px; }
     .link a { color: #00ff88; text-decoration: none; }
-    .error {
-      background: #2a0a0a; border: 1px solid #ff4444; color: #ff6666;
-      padding: 10px; border-radius: 6px; margin-bottom: 18px;
-      font-size: 13px; display: none;
-    }
+    .error { background: #2a0a0a; border: 1px solid #ff4444; color: #ff6666; padding: 10px; border-radius: 6px; margin-bottom: 18px; font-size: 13px; display: none; }
   </style>
 </head>
 <body>
@@ -58,47 +37,31 @@
   </div>
   <script>
     if (localStorage.getItem('fov_token')) window.location.href = '/dashboard.html';
-    
-    document.getElementById('loginForm').addEventListener('submit', (e) => {
+    document.getElementById('loginForm').addEventListener('submit', async (e) => {
       e.preventDefault();
+      const btn = document.getElementById('submitBtn');
       const errorBox = document.getElementById('error');
+      btn.disabled = true; btn.textContent = 'Loading...';
       errorBox.style.display = 'none';
-      
-      const name = document.getElementById('name').value.trim();
-      const password = document.getElementById('password').value;
-      
-      if (!name || !password) {
-        errorBox.textContent = 'Fill up lahat';
+      try {
+        const res = await fetch('/api/login', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            name: document.getElementById('name').value.trim(),
+            password: document.getElementById('password').value
+          })
+        });
+        const data = await res.json();
+        if (!res.ok) throw new Error(data.error || 'Login failed');
+        localStorage.setItem('fov_token', data.token);
+        localStorage.setItem('fov_user', JSON.stringify(data.user));
+        window.location.href = '/dashboard.html';
+      } catch (err) {
+        errorBox.textContent = err.message;
         errorBox.style.display = 'block';
-        return;
+        btn.disabled = false; btn.textContent = 'Login';
       }
-      
-      // Kunin ang listahan ng users
-      const users = JSON.parse(localStorage.getItem('fov_users') || '[]');
-      const user = users.find(u => u.name === name);
-      
-      if (!user) {
-        errorBox.textContent = 'Maling name o password';
-        errorBox.style.display = 'block';
-        return;
-      }
-      
-      // I-verify ang password
-      if (user.password !== password) {
-        errorBox.textContent = 'Maling name o password';
-        errorBox.style.display = 'block';
-        return;
-      }
-      
-      // Success
-      localStorage.setItem('fov_token', 'token_' + Date.now());
-      localStorage.setItem('fov_user', JSON.stringify({
-        name: user.name,
-        gmail: user.gmail,
-        role: user.role
-      }));
-      
-      window.location.href = '/dashboard.html';
     });
   </script>
 </body>
