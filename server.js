@@ -24,6 +24,7 @@ const supabase = createClient(
 
 const JWT_SECRET = process.env.JWT_SECRET || 'fov-it-secret-change-me';
 
+// ===== HELPER: ESCAPE HTML =====
 function escapeHtml(text) {
   if (!text) return '';
   return text
@@ -175,12 +176,39 @@ app.get('/api/list', async (req, res) => {
   }
 });
 
-// ===== RAW (browser = loadstring command + copy, executor = totoong script) =====
+// ===== RAW =====
 app.get('/api/raw', async (req, res) => {
   const { id } = req.query;
 
   if (!id) {
-    return res.send(`<!DOCTYPE html><html><head><title>Fov.it</title></head><body style="background:#0a0a0a;color:#ff6666;font-family:sans-serif;text-align:center;padding:50px;"><h1>❌ Invalid Link</h1></body></html>`);
+    return res.send(`
+      <!DOCTYPE html>
+      <html>
+      <head>
+        <title>Fov.it — Script Protection</title>
+        <link rel="icon" type="image/svg+xml" href="/favicon.svg">
+        <style>
+          * { margin: 0; padding: 0; box-sizing: border-box; }
+          body { font-family: 'Segoe UI', sans-serif; background: #0a0a0a; color: #fff; min-height: 100vh; display: flex; align-items: center; justify-content: center; padding: 20px; }
+          .container { background: #141414; padding: 60px 40px; border-radius: 16px; border: 1px solid #222; width: 100%; max-width: 600px; text-align: center; box-shadow: 0 0 60px rgba(255, 68, 68, 0.1); }
+          .logo { color: #00ff88; font-size: 28px; font-weight: bold; margin-bottom: 8px; }
+          .subtitle { color: #666; font-size: 13px; margin-bottom: 40px; }
+          .icon { font-size: 80px; margin-bottom: 24px; }
+          .msg { color: #ff4444; font-size: 24px; font-weight: bold; margin-bottom: 12px; }
+          .desc { color: #666; font-size: 14px; line-height: 1.6; }
+        </style>
+      </head>
+      <body>
+        <div class="container">
+          <div class="logo">Fov.it</div>
+          <div class="subtitle">Script Protection System</div>
+          <div class="icon">⚠️</div>
+          <div class="msg">Invalid Link</div>
+          <div class="desc">Walang script ID.</div>
+        </div>
+      </body>
+      </html>
+    `);
   }
 
   const { data: script, error } = await supabase
@@ -190,13 +218,40 @@ app.get('/api/raw', async (req, res) => {
     .maybeSingle();
 
   if (error || !script) {
-    return res.send(`<!DOCTYPE html><html><head><title>Fov.it</title></head><body style="background:#0a0a0a;color:#ff6666;font-family:sans-serif;text-align:center;padding:50px;"><h1>❌ Script Not Found</h1></body></html>`);
+    return res.send(`
+      <!DOCTYPE html>
+      <html>
+      <head>
+        <title>Fov.it — Script Protection</title>
+        <link rel="icon" type="image/svg+xml" href="/favicon.svg">
+        <style>
+          * { margin: 0; padding: 0; box-sizing: border-box; }
+          body { font-family: 'Segoe UI', sans-serif; background: #0a0a0a; color: #fff; min-height: 100vh; display: flex; align-items: center; justify-content: center; padding: 20px; }
+          .container { background: #141414; padding: 60px 40px; border-radius: 16px; border: 1px solid #222; width: 100%; max-width: 600px; text-align: center; box-shadow: 0 0 60px rgba(255, 68, 68, 0.1); }
+          .logo { color: #00ff88; font-size: 28px; font-weight: bold; margin-bottom: 8px; }
+          .subtitle { color: #666; font-size: 13px; margin-bottom: 40px; }
+          .icon { font-size: 80px; margin-bottom: 24px; }
+          .msg { color: #ff4444; font-size: 24px; font-weight: bold; margin-bottom: 12px; }
+          .desc { color: #666; font-size: 14px; line-height: 1.6; }
+        </style>
+      </head>
+      <body>
+        <div class="container">
+          <div class="logo">Fov.it</div>
+          <div class="subtitle">Script Protection System</div>
+          <div class="icon">❌</div>
+          <div class="msg">Script Not Found</div>
+          <div class="desc">Hindi mahanap ang script.</div>
+        </div>
+      </body>
+      </html>
+    `);
   }
 
   const userAgent = (req.headers['user-agent'] || '').toLowerCase();
   const isBrowser = /mozilla|chrome|safari|firefox|edge|opera|trident/i.test(userAgent);
 
-  // ===== EXECUTOR =====
+  // ===== EXECUTOR (Roblox loadstring) =====
   if (!isBrowser) {
     res.setHeader('Content-Type', 'text/plain; charset=utf-8');
     return res.status(200).send(script.content);
@@ -220,41 +275,185 @@ app.get('/api/raw', async (req, res) => {
       <meta name="twitter:card" content="summary_large_image">
       <style>
         * { margin: 0; padding: 0; box-sizing: border-box; }
-        body { font-family: 'Segoe UI', sans-serif; background: #0a0a0a; color: #fff; min-height: 100vh; display: flex; align-items: center; justify-content: center; padding: 20px; }
-        .container { background: #141414; padding: 40px; border-radius: 12px; border: 1px solid #222; width: 100%; max-width: 700px; }
-        .logo { color: #00ff88; font-size: 24px; font-weight: bold; text-align: center; margin-bottom: 8px; }
-        .subtitle { color: #666; font-size: 12px; text-align: center; margin-bottom: 30px; }
-        h1 { color: #fff; font-size: 20px; margin-bottom: 8px; }
-        .meta { color: #666; font-size: 12px; margin-bottom: 20px; }
-        .code-box { background: #0a0a0a; border: 1px solid #00ff88; border-radius: 8px; padding: 16px; margin-bottom: 16px; font-family: 'Consolas', 'Monaco', monospace; font-size: 12px; color: #00ff88; word-break: break-all; line-height: 1.5; }
-        .copy-btn { width: 100%; padding: 14px; background: #00ff88; color: #0a0a0a; border: none; border-radius: 6px; font-size: 14px; font-weight: bold; cursor: pointer; margin-bottom: 12px; }
-        .copy-btn:hover { background: #00cc6a; }
-        .copy-btn.copied { background: #0a2a0a; color: #00ff88; border: 1px solid #00ff88; }
-        .note { color: #666; font-size: 12px; text-align: center; margin-top: 16px; line-height: 1.6; }
-        .footer { text-align: center; color: #666; font-size: 11px; margin-top: 20px; padding-top: 20px; border-top: 1px solid #222; }
+        body { 
+          font-family: 'Segoe UI', sans-serif; 
+          background: #0a0a0a; 
+          color: #fff; 
+          min-height: 100vh; 
+          display: flex; 
+          align-items: center; 
+          justify-content: center; 
+          padding: 20px;
+          background-image: 
+            radial-gradient(circle at 20% 20%, rgba(0, 255, 136, 0.05) 0%, transparent 50%),
+            radial-gradient(circle at 80% 80%, rgba(0, 255, 136, 0.05) 0%, transparent 50%);
+        }
+        .container { 
+          background: #141414; 
+          padding: 48px 40px; 
+          border-radius: 16px; 
+          border: 1px solid #222; 
+          width: 100%; 
+          max-width: 720px;
+          box-shadow: 0 0 80px rgba(0, 255, 136, 0.08);
+          animation: fadeIn 0.5s ease;
+        }
+        @keyframes fadeIn {
+          from { opacity: 0; transform: translateY(20px); }
+          to { opacity: 1; transform: translateY(0); }
+        }
+        .header { text-align: center; margin-bottom: 32px; }
+        .logo { 
+          color: #00ff88; 
+          font-size: 32px; 
+          font-weight: bold; 
+          margin-bottom: 6px;
+          text-shadow: 0 0 30px rgba(0, 255, 136, 0.5);
+        }
+        .subtitle { color: #666; font-size: 12px; letter-spacing: 2px; text-transform: uppercase; }
+        .divider { 
+          height: 1px; 
+          background: linear-gradient(90deg, transparent, #222, transparent); 
+          margin: 24px 0;
+        }
+        .title-section { margin-bottom: 24px; }
+        .title-section h1 { 
+          color: #fff; 
+          font-size: 22px; 
+          margin-bottom: 6px;
+          display: flex;
+          align-items: center;
+          gap: 10px;
+        }
+        .title-section .meta { color: #666; font-size: 12px; }
+        .badge { 
+          display: inline-block; 
+          background: #00ff88; 
+          color: #0a0a0a; 
+          padding: 4px 12px; 
+          border-radius: 20px; 
+          font-size: 10px; 
+          font-weight: bold; 
+          text-transform: uppercase;
+          letter-spacing: 1px;
+        }
+        .badge-protected { background: #ff4444; color: #fff; }
+        .code-section { margin-bottom: 20px; }
+        .code-label { 
+          color: #666; 
+          font-size: 11px; 
+          margin-bottom: 8px; 
+          text-transform: uppercase;
+          letter-spacing: 1px;
+        }
+        .code-box { 
+          background: #0a0a0a; 
+          border: 1px solid #00ff88; 
+          border-radius: 10px; 
+          padding: 18px; 
+          font-family: 'Consolas', 'Monaco', monospace; 
+          font-size: 12px; 
+          color: #00ff88; 
+          word-break: break-all; 
+          line-height: 1.6;
+          position: relative;
+          overflow: hidden;
+        }
+        .code-box::before {
+          content: '';
+          position: absolute;
+          top: 0;
+          left: 0;
+          right: 0;
+          height: 2px;
+          background: linear-gradient(90deg, transparent, #00ff88, transparent);
+        }
+        .copy-btn { 
+          width: 100%; 
+          padding: 16px; 
+          background: linear-gradient(135deg, #00ff88, #00cc6a); 
+          color: #0a0a0a; 
+          border: none; 
+          border-radius: 10px; 
+          font-size: 14px; 
+          font-weight: bold; 
+          cursor: pointer; 
+          margin-bottom: 12px;
+          transition: all 0.3s ease;
+          letter-spacing: 1px;
+        }
+        .copy-btn:hover { 
+          transform: translateY(-2px);
+          box-shadow: 0 8px 25px rgba(0, 255, 136, 0.4);
+        }
+        .copy-btn:active { transform: translateY(0); }
+        .copy-btn.copied { 
+          background: linear-gradient(135deg, #0a2a0a, #0a2a0a); 
+          color: #00ff88; 
+          border: 1px solid #00ff88;
+        }
+        .note { 
+          color: #666; 
+          font-size: 12px; 
+          text-align: center; 
+          margin-top: 16px; 
+          line-height: 1.6;
+        }
+        .note strong { color: #00ff88; }
+        .footer { 
+          text-align: center; 
+          color: #444; 
+          font-size: 11px; 
+          margin-top: 24px; 
+          padding-top: 20px; 
+          border-top: 1px solid #1a1a1a;
+        }
         .footer a { color: #00ff88; text-decoration: none; }
+        .footer a:hover { text-decoration: underline; }
       </style>
     </head>
     <body>
       <div class="container">
-        <div class="logo">Fov.it</div>
-        <div class="subtitle">Script Protection System</div>
-        <h1>📋 ${escapeHtml(script.title)}</h1>
-        <p class="meta">I-copy ang loadstring command sa ibaba at i-paste sa Roblox executor.</p>
-        <div class="code-box" id="code">${escapeHtml(loadstringCmd)}</div>
-        <button class="copy-btn" id="copyBtn" onclick="copyCode()">📋 Copy Loadstring</button>
-        <div class="note">I-paste ito sa Roblox executor (Krnl, Fluxus, Synapse, etc.).</div>
-        <div class="footer">Protektado ng <a href="/">Fov.it</a></div>
+        <div class="header">
+          <div class="logo">Fov.it</div>
+          <div class="subtitle">Script Protection System</div>
+        </div>
+
+        <div class="divider"></div>
+
+        <div class="title-section">
+          <h1>📋 ${escapeHtml(script.title)}</h1>
+          <div class="meta">
+            <span class="badge badge-protected">🔒 Protected</span>
+            <span style="margin-left: 10px;">ID: ${id}</span>
+          </div>
+        </div>
+
+        <div class="code-section">
+          <div class="code-label">Loadstring Command</div>
+          <div class="code-box" id="code">${escapeHtml(loadstringCmd)}</div>
+        </div>
+
+        <button class="copy-btn" id="copyBtn" onclick="copyCode()">📋 COPY LOADSTRING</button>
+
+        <div class="note">
+          I-paste ito sa <strong>Roblox executor</strong> (Krnl, Fluxus, Synapse, etc.).
+        </div>
+
+        <div class="footer">
+          Protektado ng <a href="/">Fov.it</a> · ${new Date().getFullYear()}
+        </div>
       </div>
+
       <script>
         function copyCode() {
           const code = document.getElementById('code').textContent;
           const btn = document.getElementById('copyBtn');
           const done = () => {
-            btn.textContent = '✅ Copied!';
+            btn.textContent = '✅ COPIED!';
             btn.classList.add('copied');
             setTimeout(() => {
-              btn.textContent = '📋 Copy Loadstring';
+              btn.textContent = '📋 COPY LOADSTRING';
               btn.classList.remove('copied');
             }, 2000);
           };
