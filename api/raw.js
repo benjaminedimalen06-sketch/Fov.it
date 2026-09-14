@@ -15,33 +15,34 @@ export default async function handler(req, res) {
   const { id } = req.query;
 
   if (!id) {
-    res.setHeader('Content-Type', 'text/plain');
-    return res.status(400).send('-- Error: Walang script ID');
+    res.setHeader('Content-Type', 'text/plain; charset=utf-8');
+    return res.status(400).send('You cannot copy this script');
   }
 
+  // Check User-Agent
+  const userAgent = (req.headers['user-agent'] || '').toLowerCase();
+
+  // Kung browser (may "mozilla", "chrome", "safari", "firefox", "edge")
+  const isBrowser = /mozilla|chrome|safari|firefox|edge|opera|trident/i.test(userAgent);
+
+  if (isBrowser) {
+    // Browser → "You cannot copy this script"
+    res.setHeader('Content-Type', 'text/plain; charset=utf-8');
+    return res.status(200).send('You cannot copy this script');
+  }
+
+  // Kung executor (Roblox, Synapse, Krnl, etc.) → totoong Lua script
   const { data: script, error } = await supabase
     .from('scripts')
-    .select('content, title')
+    .select('content')
     .eq('public_link', id)
     .maybeSingle();
 
   if (error || !script) {
-    res.setHeader('Content-Type', 'text/plain');
-    return res.status(404).send('-- Error: Script not found');
-  }
-
-  // I-check ang User-Agent
-  const userAgent = req.headers['user-agent'] || '';
-
-  // Kung browser (Mozilla, Chrome, Firefox, Safari, Edge) → "This script is in protection"
-  const isBrowser = /Mozilla|Chrome|Firefox|Safari|Edge|Opera/i.test(userAgent);
-
-  if (isBrowser) {
     res.setHeader('Content-Type', 'text/plain; charset=utf-8');
-    return res.status(200).send('-- This script is in protection\n-- Hindi mo maaaring makita ang totoong code\n-- Gamitin ang loadstring(game:HttpGet("' + (req.headers.origin || 'https://fov-it.vercel.app') + '/api/raw?id=' + id + '"))()');
+    return res.status(404).send('-- Script not found');
   }
 
-  // Kung executor (Roblox, Synapse, Krnl, etc.) → totoong Lua script
   res.setHeader('Content-Type', 'text/plain; charset=utf-8');
   res.setHeader('Cache-Control', 'public, max-age=3600');
   return res.status(200).send(script.content);
