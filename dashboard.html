@@ -11,6 +11,8 @@
     .logo { color: #00ff88; font-size: 20px; font-weight: bold; }
     .user-info { display: flex; align-items: center; gap: 16px; font-size: 13px; color: #aaa; }
     .badge { background: #00ff88; color: #0a0a0a; padding: 3px 10px; border-radius: 12px; font-size: 11px; font-weight: bold; text-transform: uppercase; }
+    .admin-btn { background: #ff4444; color: #fff; padding: 8px 16px; border-radius: 6px; text-decoration: none; font-size: 13px; font-weight: bold; }
+    .admin-btn:hover { background: #cc0000; }
     .logout-btn { background: #222; color: #fff; border: none; padding: 8px 16px; border-radius: 6px; cursor: pointer; font-size: 13px; }
     .logout-btn:hover { background: #ff4444; }
     .container { max-width: 1100px; margin: 0 auto; padding: 32px 24px; }
@@ -39,7 +41,6 @@
     .btn-view:hover { background: #444; }
     .empty { text-align: center; color: #666; padding: 60px 20px; background: #141414; border: 1px dashed #222; border-radius: 8px; }
     .toast { position: fixed; bottom: 20px; right: 20px; background: #00ff88; color: #0a0a0a; padding: 12px 20px; border-radius: 6px; font-weight: bold; display: none; z-index: 999; }
-    .raw-link-box { background: #0a2a0a; border: 1px solid #00ff88; color: #00ff88; padding: 10px 14px; border-radius: 6px; margin-top: 8px; font-size: 11px; word-break: break-all; font-family: 'Consolas', monospace; }
   </style>
 </head>
 <body>
@@ -48,6 +49,7 @@
     <div class="user-info">
       <span id="username">...</span>
       <span class="badge" id="roleBadge">...</span>
+      <a href="/admin.html" id="adminBtn" class="admin-btn" style="display:none;">🔐 Admin Panel</a>
       <button class="logout-btn" onclick="logout()">Logout</button>
     </div>
   </div>
@@ -69,7 +71,10 @@
 
     document.getElementById('username').textContent = user.name || '?';
     document.getElementById('roleBadge').textContent = user.role || 'user';
-    if (user.role === 'owner') document.getElementById('ownerBanner').style.display = 'block';
+    if (user.role === 'owner') {
+      document.getElementById('ownerBanner').style.display = 'block';
+      document.getElementById('adminBtn').style.display = 'inline-block';
+    }
 
     async function loadScripts() {
       const list = document.getElementById('scriptsList');
