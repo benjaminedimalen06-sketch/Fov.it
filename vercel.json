@@ -1,10 +1,5 @@
 {
   "version": 2,
-  "functions": {
-    "api/**/*.js": {
-      "runtime": "@vercel/node@3.2.0"
-    }
-  },
   "rewrites": [
     { "source": "/s/:link", "destination": "/view.html" }
   ]
