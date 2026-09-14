@@ -4,6 +4,12 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Fov.it — Login</title>
+  <link rel="icon" type="image/svg+xml" href="/favicon.svg">
+  <meta property="og:title" content="Fov.it — Script Protection System">
+  <meta property="og:description" content="Protektado ang iyong Lua scripts.">
+  <meta property="og:image" content="https://fov-it.onrender.com/og-image.svg">
+  <meta property="og:url" content="https://fov-it.onrender.com">
+  <meta name="twitter:card" content="summary_large_image">
   <style>
     * { margin: 0; padding: 0; box-sizing: border-box; }
     body { font-family: 'Segoe UI', sans-serif; background: #0a0a0a; color: #fff; min-height: 100vh; display: flex; align-items: center; justify-content: center; }
@@ -28,9 +34,9 @@
     <div class="error" id="error"></div>
     <form id="loginForm">
       <label>Name</label>
-      <input type="text" id="name" required autocomplete="username">
+      <input type="text" id="name" required>
       <label>Password</label>
-      <input type="password" id="password" required autocomplete="current-password">
+      <input type="password" id="password" required>
       <button type="submit" id="submitBtn">Login</button>
     </form>
     <p class="link">Wala pang account? <a href="/register.html">Register</a></p>
