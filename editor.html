@@ -40,7 +40,6 @@
     <h1 id="pageTitle">Bagong Script</h1>
     <div class="error" id="error"></div>
     <div class="raw-link-box" id="rawBox"></div>
-
     <form id="editorForm">
       <label>Script Name (Title)</label>
       <input type="text" id="title" required placeholder="Pangalan ng script">
@@ -53,8 +52,10 @@
     </form>
   </div>
   <div class="toast" id="toast">Saved!</div>
-
   <script>
+    const token = localStorage.getItem('fov_token');
+    if (!token) window.location.href = '/';
+
     const params = new URLSearchParams(window.location.search);
     const editId = params.get('id');
 
@@ -65,21 +66,22 @@
 
     async function loadScript(id) {
       try {
-        const res = await fetch('/api/single?id=' + id);
+        const res = await fetch('/api/single?id=' + id, {
+          headers: { 'Authorization': 'Bearer ' + token }
+        });
         const data = await res.json();
         if (!res.ok) throw new Error(data.error);
-        
         document.getElementById('title').value = data.script.title;
         document.getElementById('content').value = data.script.content;
-
         const rawLink = window.location.origin + '/api/raw?id=' + data.script.public_link;
+        const viewLink = rawLink + '&token=' + token;
         const rawBox = document.getElementById('rawBox');
         rawBox.style.display = 'block';
         rawBox.innerHTML = `
-          <strong>📋 Raw Link:</strong><br>
-          <code>${rawLink}</code><br><br>
-          <strong>Para gamitin sa Roblox:</strong><br>
-          <code>loadstring(game:HttpGet("${rawLink}"))()</code>
+          <strong>📋 Raw Link (Roblox):</strong><br>
+          <code>loadstring(game:HttpGet("${rawLink}"))()</code><br><br>
+          <strong>👁️ View Link (Browser, may token):</strong><br>
+          <code>${viewLink}</code>
         `;
       } catch (err) {
         document.getElementById('error').textContent = err.message;
@@ -94,42 +96,38 @@
       btn.disabled = true;
       btn.textContent = 'Saving...';
       errorBox.style.display = 'none';
-
       const title = document.getElementById('title').value.trim();
       const content = document.getElementById('content').value;
-
       try {
         let res;
         if (editId) {
           res = await fetch('/api/edit', {
             method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
+            headers: { 'Content-Type': 'application/json', 'Authorization': 'Bearer ' + token },
             body: JSON.stringify({ id: editId, title, content })
           });
         } else {
           res = await fetch('/api/upload', {
             method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
+            headers: { 'Content-Type': 'application/json', 'Authorization': 'Bearer ' + token },
             body: JSON.stringify({ title, content })
           });
         }
-
         const data = await res.json();
         if (!res.ok) throw new Error(data.error || 'Failed to save');
-
         if (data.script && data.script.public_link) {
           const rawLink = window.location.origin + '/api/raw?id=' + data.script.public_link;
+          const viewLink = rawLink + '&token=' + token;
           const rawBox = document.getElementById('rawBox');
           rawBox.style.display = 'block';
           rawBox.innerHTML = `
             ✅ <strong>Saved!</strong><br><br>
-            <strong>📋 Raw Link:</strong><br>
-            <code>${rawLink}</code><br><br>
-            <strong>Para gamitin sa Roblox:</strong><br>
-            <code>loadstring(game:HttpGet("${rawLink}"))()</code>
+            <strong>📋 Raw Link (Roblox):</strong><br>
+            <code>loadstring(game:HttpGet("${rawLink}"))()</code><br><br>
+            <strong>👁️ View Link (Browser, may token):</strong><br>
+            <code>${viewLink}</code>
           `;
         }
-
         showToast(editId ? 'Updated!' : 'Created!');
         setTimeout(() => window.location.href = '/dashboard.html', 2000);
       } catch (err) {
