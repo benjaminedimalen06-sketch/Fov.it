@@ -18,7 +18,7 @@ export default async function handler(req, res) {
   if (req.method !== 'POST') return res.status(405).json({ error: 'Method not allowed' });
 
   try {
-    const { title, content } = req.body;
+    const { title, content, owner } = req.body;
 
     if (!title || !content) {
       return res.status(400).json({ error: 'Title at content ay kailangan' });
@@ -26,6 +26,7 @@ export default async function handler(req, res) {
 
     const link = generateLink();
 
+    // I-save sa Supabase kasama ang owner name
     const { data, error } = await supabase
       .from('scripts')
       .insert({
@@ -49,7 +50,8 @@ export default async function handler(req, res) {
       success: true,
       script: data,
       raw_link: rawLink,
-      link: link
+      link: link,
+      owner: owner || 'unknown'
     });
 
   } catch (err) {
