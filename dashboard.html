@@ -30,7 +30,6 @@
       position: relative;
     }
     
-    /* Animated background */
     body::before {
       content: '';
       position: fixed;
@@ -49,7 +48,6 @@
       50% { opacity: 1; }
     }
     
-    /* Floating orbs */
     .orb {
       position: fixed;
       border-radius: 50%;
@@ -506,19 +504,19 @@
 
   <div class="container">
     <div id="ownerBanner" class="owner-banner" style="display:none;">
-      👑 <strong>Ikaw ang OWNER</strong> — Makikita mo lahat ng scripts ng lahat ng users.
+      👑 <strong>You are the OWNER</strong> — You can see all scripts from all users.
     </div>
 
     <div class="hero">
       <h1>My Pastes</h1>
-      <p>Lahat ng iyong protektadong Lua scripts</p>
-      <a href="/editor.html" class="new-btn">✨ Bagong Script</a>
+      <p>All your protected Lua scripts</p>
+      <a href="/editor.html" class="new-btn">✨ New Script</a>
     </div>
 
     <div class="stats-grid" id="statsGrid"></div>
 
     <div class="section-title">
-      <h2>📋 Iyong Scripts</h2>
+      <h2>📋 Your Scripts</h2>
     </div>
 
     <div id="scriptsList"></div>
@@ -573,8 +571,8 @@
           list.innerHTML = `
             <div class="empty">
               <div class="empty-icon">📝</div>
-              <h3>Wala pang scripts</h3>
-              <p>Click "✨ Bagong Script" para gumawa ng iyong unang script.</p>
+              <h3>No scripts yet</h3>
+              <p>Click "✨ New Script" to create your first script.</p>
             </div>
           `;
           return;
@@ -634,7 +632,7 @@
     }
 
     async function deleteScript(id) {
-      if (!confirm('Sigurado ka bang gusto mong burahin ito?')) return;
+      if (!confirm('Are you sure you want to delete this?')) return;
       try {
         const res = await fetch('/api/delete', {
           method: 'POST',
