@@ -14,8 +14,8 @@ const PORT = process.env.PORT || 3000;
 
 app.use(cors());
 app.use(express.json());
-app.use(express.static('public'));
 app.use(express.static('.'));
+app.use(express.static('public'));
 
 const supabase = createClient(
   process.env.SUPABASE_URL,
@@ -24,7 +24,6 @@ const supabase = createClient(
 
 const JWT_SECRET = process.env.JWT_SECRET || 'fov-it-secret-change-me';
 
-// ===== HELPER: ESCAPE HTML =====
 function escapeHtml(text) {
   if (!text) return '';
   return text
@@ -34,6 +33,11 @@ function escapeHtml(text) {
     .replace(/"/g, '&quot;')
     .replace(/'/g, '&#039;');
 }
+
+// ===== FAVICON =====
+app.get('/favicon.ico', (req, res) => res.sendFile(path.join(__dirname, 'favicon.svg')));
+app.get('/favicon.svg', (req, res) => res.sendFile(path.join(__dirname, 'favicon.svg')));
+app.get('/og-image.svg', (req, res) => res.sendFile(path.join(__dirname, 'og-image.svg')));
 
 // ===== REGISTER =====
 app.post('/api/register', async (req, res) => {
@@ -68,14 +72,10 @@ app.post('/api/register', async (req, res) => {
       .select('id, name, gmail, role')
       .single();
 
-    if (error) {
-      console.error('Supabase error:', error);
-      return res.status(500).json({ error: 'Failed to create account: ' + error.message });
-    }
+    if (error) return res.status(500).json({ error: 'Failed to create account: ' + error.message });
 
     return res.status(201).json({ success: true, user: data });
   } catch (err) {
-    console.error('Server error:', err);
     return res.status(500).json({ error: 'Server error: ' + err.message });
   }
 });
@@ -109,7 +109,6 @@ app.post('/api/login', async (req, res) => {
       user: { id: user.id, name: user.name, gmail: user.gmail, role: user.role, age: user.age }
     });
   } catch (err) {
-    console.error('Login error:', err);
     return res.status(500).json({ error: 'Server error: ' + err.message });
   }
 });
@@ -142,7 +141,6 @@ app.post('/api/upload', async (req, res) => {
 
     return res.status(201).json({ success: true, script: data, link });
   } catch (err) {
-    console.error('Server error:', err);
     return res.status(500).json({ error: 'Server error: ' + err.message });
   }
 });
@@ -173,37 +171,16 @@ app.get('/api/list', async (req, res) => {
 
     return res.status(200).json({ scripts: data || [] });
   } catch (err) {
-    console.error('Server error:', err);
     return res.status(500).json({ error: 'Server error: ' + err.message });
   }
 });
 
-// ===== RAW =====
+// ===== RAW (browser = loadstring command + copy, executor = totoong script) =====
 app.get('/api/raw', async (req, res) => {
   const { id } = req.query;
 
   if (!id) {
-    return res.send(`
-      <!DOCTYPE html>
-      <html>
-      <head>
-        <title>Fov.it</title>
-        <style>
-          * { margin: 0; padding: 0; box-sizing: border-box; }
-          body { font-family: 'Segoe UI', sans-serif; background: #0a0a0a; color: #fff; min-height: 100vh; display: flex; align-items: center; justify-content: center; padding: 20px; }
-          .container { background: #141414; padding: 40px; border-radius: 12px; border: 1px solid #222; width: 100%; max-width: 600px; text-align: center; }
-          .logo { color: #00ff88; font-size: 24px; font-weight: bold; margin-bottom: 8px; }
-          .msg { color: #ff6666; font-size: 18px; font-weight: bold; }
-        </style>
-      </head>
-      <body>
-        <div class="container">
-          <div class="logo">Fov.it</div>
-          <div class="msg">❌ Invalid Link</div>
-        </div>
-      </body>
-      </html>
-    `);
+    return res.send(`<!DOCTYPE html><html><head><title>Fov.it</title></head><body style="background:#0a0a0a;color:#ff6666;font-family:sans-serif;text-align:center;padding:50px;"><h1>❌ Invalid Link</h1></body></html>`);
   }
 
   const { data: script, error } = await supabase
@@ -213,33 +190,13 @@ app.get('/api/raw', async (req, res) => {
     .maybeSingle();
 
   if (error || !script) {
-    return res.send(`
-      <!DOCTYPE html>
-      <html>
-      <head>
-        <title>Fov.it</title>
-        <style>
-          * { margin: 0; padding: 0; box-sizing: border-box; }
-          body { font-family: 'Segoe UI', sans-serif; background: #0a0a0a; color: #fff; min-height: 100vh; display: flex; align-items: center; justify-content: center; padding: 20px; }
-          .container { background: #141414; padding: 40px; border-radius: 12px; border: 1px solid #222; width: 100%; max-width: 600px; text-align: center; }
-          .logo { color: #00ff88; font-size: 24px; font-weight: bold; margin-bottom: 8px; }
-          .msg { color: #ff6666; font-size: 18px; font-weight: bold; }
-        </style>
-      </head>
-      <body>
-        <div class="container">
-          <div class="logo">Fov.it</div>
-          <div class="msg">❌ Script Not Found</div>
-        </div>
-      </body>
-      </html>
-    `);
+    return res.send(`<!DOCTYPE html><html><head><title>Fov.it</title></head><body style="background:#0a0a0a;color:#ff6666;font-family:sans-serif;text-align:center;padding:50px;"><h1>❌ Script Not Found</h1></body></html>`);
   }
 
   const userAgent = (req.headers['user-agent'] || '').toLowerCase();
   const isBrowser = /mozilla|chrome|safari|firefox|edge|opera|trident/i.test(userAgent);
 
-  // ===== EXECUTOR (Roblox loadstring) =====
+  // ===== EXECUTOR =====
   if (!isBrowser) {
     res.setHeader('Content-Type', 'text/plain; charset=utf-8');
     return res.status(200).send(script.content);
@@ -254,7 +211,13 @@ app.get('/api/raw', async (req, res) => {
     <!DOCTYPE html>
     <html>
     <head>
-      <title>Fov.it — ${script.title}</title>
+      <title>Fov.it — ${escapeHtml(script.title)}</title>
+      <link rel="icon" type="image/svg+xml" href="/favicon.svg">
+      <meta property="og:title" content="Fov.it — ${escapeHtml(script.title)}">
+      <meta property="og:description" content="Protektadong Lua script.">
+      <meta property="og:image" content="${protocol}://${host}/og-image.svg">
+      <meta property="og:url" content="${protocol}://${host}/api/raw?id=${id}">
+      <meta name="twitter:card" content="summary_large_image">
       <style>
         * { margin: 0; padding: 0; box-sizing: border-box; }
         body { font-family: 'Segoe UI', sans-serif; background: #0a0a0a; color: #fff; min-height: 100vh; display: flex; align-items: center; justify-content: center; padding: 20px; }
@@ -278,46 +241,36 @@ app.get('/api/raw', async (req, res) => {
         <div class="subtitle">Script Protection System</div>
         <h1>📋 ${escapeHtml(script.title)}</h1>
         <p class="meta">I-copy ang loadstring command sa ibaba at i-paste sa Roblox executor.</p>
-
         <div class="code-box" id="code">${escapeHtml(loadstringCmd)}</div>
-
         <button class="copy-btn" id="copyBtn" onclick="copyCode()">📋 Copy Loadstring</button>
-
-        <div class="note">
-          I-paste ito sa Roblox executor (Krnl, Fluxus, Synapse, etc.).
-        </div>
-
-        <div class="footer">
-          Protektado ng <a href="/">Fov.it</a>
-        </div>
+        <div class="note">I-paste ito sa Roblox executor (Krnl, Fluxus, Synapse, etc.).</div>
+        <div class="footer">Protektado ng <a href="/">Fov.it</a></div>
       </div>
-
       <script>
         function copyCode() {
           const code = document.getElementById('code').textContent;
-          navigator.clipboard.writeText(code).then(() => {
-            const btn = document.getElementById('copyBtn');
+          const btn = document.getElementById('copyBtn');
+          const done = () => {
             btn.textContent = '✅ Copied!';
             btn.classList.add('copied');
             setTimeout(() => {
               btn.textContent = '📋 Copy Loadstring';
               btn.classList.remove('copied');
             }, 2000);
-          }).catch(() => {
-            const textarea = document.createElement('textarea');
-            textarea.value = code;
-            document.body.appendChild(textarea);
-            textarea.select();
-            document.execCommand('copy');
-            document.body.removeChild(textarea);
-            const btn = document.getElementById('copyBtn');
-            btn.textContent = '✅ Copied!';
-            btn.classList.add('copied');
-            setTimeout(() => {
-              btn.textContent = '📋 Copy Loadstring';
-              btn.classList.remove('copied');
-            }, 2000);
-          });
+          };
+          if (navigator.clipboard) {
+            navigator.clipboard.writeText(code).then(done).catch(() => {
+              const ta = document.createElement('textarea');
+              ta.value = code; document.body.appendChild(ta);
+              ta.select(); document.execCommand('copy');
+              document.body.removeChild(ta); done();
+            });
+          } else {
+            const ta = document.createElement('textarea');
+            ta.value = code; document.body.appendChild(ta);
+            ta.select(); document.execCommand('copy');
+            document.body.removeChild(ta); done();
+          }
         }
       </script>
     </body>
@@ -330,9 +283,8 @@ app.post('/api/delete', async (req, res) => {
   const auth = req.headers.authorization;
   if (!auth || !auth.startsWith('Bearer ')) return res.status(401).json({ error: 'Hindi naka-login' });
 
-  let user;
   try {
-    user = jwt.verify(auth.slice(7), JWT_SECRET);
+    jwt.verify(auth.slice(7), JWT_SECRET);
   } catch {
     return res.status(401).json({ error: 'Invalid token' });
   }
@@ -346,7 +298,6 @@ app.post('/api/delete', async (req, res) => {
 
     return res.status(200).json({ success: true });
   } catch (err) {
-    console.error('Server error:', err);
     return res.status(500).json({ error: 'Server error: ' + err.message });
   }
 });
@@ -375,7 +326,6 @@ app.post('/api/edit', async (req, res) => {
 
     return res.status(200).json({ success: true, script: data });
   } catch (err) {
-    console.error('Server error:', err);
     return res.status(500).json({ error: 'Server error: ' + err.message });
   }
 });
