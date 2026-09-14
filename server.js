@@ -24,7 +24,6 @@ const supabase = createClient(
 
 const JWT_SECRET = process.env.JWT_SECRET || 'fov-it-secret-change-me';
 
-// ===== HELPER: ESCAPE HTML =====
 function escapeHtml(text) {
   if (!text) return '';
   return text
@@ -46,11 +45,11 @@ app.post('/api/register', async (req, res) => {
     const { name, gmail, password, age } = req.body;
 
     if (!name || !gmail || !password || !age) {
-      return res.status(400).json({ error: 'Lahat ng fields ay kailangan' });
+      return res.status(400).json({ error: 'All fields are required' });
     }
-    if (name.length < 3) return res.status(400).json({ error: 'Name min 3 characters' });
+    if (name.length < 3) return res.status(400).json({ error: 'Name must be at least 3 characters' });
     if (!gmail.includes('@')) return res.status(400).json({ error: 'Invalid Gmail' });
-    if (password.length < 6) return res.status(400).json({ error: 'Password min 6 characters' });
+    if (password.length < 6) return res.status(400).json({ error: 'Password must be at least 6 characters' });
     if (age < 10 || age > 100) return res.status(400).json({ error: 'Age must be 10-100' });
 
     const { data: existing } = await supabase
@@ -85,7 +84,7 @@ app.post('/api/register', async (req, res) => {
 app.post('/api/login', async (req, res) => {
   try {
     const { name, password } = req.body;
-    if (!name || !password) return res.status(400).json({ error: 'Name at password ay kailangan' });
+    if (!name || !password) return res.status(400).json({ error: 'Name and password are required' });
 
     const { data: user, error } = await supabase
       .from('users')
@@ -93,10 +92,10 @@ app.post('/api/login', async (req, res) => {
       .eq('name', name)
       .maybeSingle();
 
-    if (error || !user) return res.status(401).json({ error: 'Maling name o password' });
+    if (error || !user) return res.status(401).json({ error: 'Incorrect name or password' });
 
     const valid = await bcrypt.compare(password, user.password);
-    if (!valid) return res.status(401).json({ error: 'Maling name o password' });
+    if (!valid) return res.status(401).json({ error: 'Incorrect name or password' });
 
     const token = jwt.sign(
       { id: user.id, name: user.name, role: user.role },
@@ -117,7 +116,7 @@ app.post('/api/login', async (req, res) => {
 // ===== UPLOAD =====
 app.post('/api/upload', async (req, res) => {
   const auth = req.headers.authorization;
-  if (!auth || !auth.startsWith('Bearer ')) return res.status(401).json({ error: 'Hindi naka-login' });
+  if (!auth || !auth.startsWith('Bearer ')) return res.status(401).json({ error: 'Not logged in' });
 
   let user;
   try {
@@ -128,7 +127,7 @@ app.post('/api/upload', async (req, res) => {
 
   try {
     const { title, content } = req.body;
-    if (!title || !content) return res.status(400).json({ error: 'Title at content ay kailangan' });
+    if (!title || !content) return res.status(400).json({ error: 'Title and content are required' });
 
     const link = Math.random().toString(36).substring(2, 12);
 
@@ -146,10 +145,10 @@ app.post('/api/upload', async (req, res) => {
   }
 });
 
-// ===== LIST =====
+// ===== LIST (user sees own scripts, owner sees all) =====
 app.get('/api/list', async (req, res) => {
   const auth = req.headers.authorization;
-  if (!auth || !auth.startsWith('Bearer ')) return res.status(401).json({ error: 'Hindi naka-login' });
+  if (!auth || !auth.startsWith('Bearer ')) return res.status(401).json({ error: 'Not logged in' });
 
   let user;
   try {
@@ -165,7 +164,10 @@ app.get('/api/list', async (req, res) => {
       .select('id, title, public_link, user_id, created_at, updated_at')
       .order('created_at', { ascending: false });
 
-    if (!isOwner) query = query.eq('user_id', user.id);
+    // Owner sees all, user sees own only
+    if (!isOwner) {
+      query = query.eq('user_id', user.id);
+    }
 
     const { data, error } = await query;
     if (error) return res.status(500).json({ error: 'Failed to fetch: ' + error.message });
@@ -181,30 +183,7 @@ app.get('/api/raw', async (req, res) => {
   const { id } = req.query;
 
   if (!id) {
-    return res.send(`
-      <!DOCTYPE html>
-      <html>
-      <head>
-        <title>Fov.it — Script Protection</title>
-        <link rel="icon" type="image/svg+xml" href="/favicon.svg">
-        <style>
-          * { margin: 0; padding: 0; box-sizing: border-box; }
-          body { font-family: 'Segoe UI', sans-serif; background: #0a0a0a; color: #fff; min-height: 100vh; display: flex; align-items: center; justify-content: center; padding: 20px; }
-          .container { background: #141414; padding: 60px 40px; border-radius: 16px; border: 1px solid #222; width: 100%; max-width: 600px; text-align: center; }
-          .logo { color: #00ff88; font-size: 28px; font-weight: bold; margin-bottom: 8px; }
-          .msg { color: #ff4444; font-size: 24px; font-weight: bold; margin-bottom: 12px; }
-          .desc { color: #666; font-size: 14px; line-height: 1.6; }
-        </style>
-      </head>
-      <body>
-        <div class="container">
-          <div class="logo">Fov.it</div>
-          <div class="msg">❌ Invalid Link</div>
-          <div class="desc">Walang script ID.</div>
-        </div>
-      </body>
-      </html>
-    `);
+    return res.send(`<!DOCTYPE html><html><head><title>Fov.it</title></head><body style="background:#0a0a0a;color:#ff6666;font-family:sans-serif;text-align:center;padding:50px;"><h1>❌ Invalid Link</h1></body></html>`);
   }
 
   const { data: script, error } = await supabase
@@ -214,42 +193,17 @@ app.get('/api/raw', async (req, res) => {
     .maybeSingle();
 
   if (error || !script) {
-    return res.send(`
-      <!DOCTYPE html>
-      <html>
-      <head>
-        <title>Fov.it — Script Protection</title>
-        <link rel="icon" type="image/svg+xml" href="/favicon.svg">
-        <style>
-          * { margin: 0; padding: 0; box-sizing: border-box; }
-          body { font-family: 'Segoe UI', sans-serif; background: #0a0a0a; color: #fff; min-height: 100vh; display: flex; align-items: center; justify-content: center; padding: 20px; }
-          .container { background: #141414; padding: 60px 40px; border-radius: 16px; border: 1px solid #222; width: 100%; max-width: 600px; text-align: center; }
-          .logo { color: #00ff88; font-size: 28px; font-weight: bold; margin-bottom: 8px; }
-          .msg { color: #ff4444; font-size: 24px; font-weight: bold; margin-bottom: 12px; }
-          .desc { color: #666; font-size: 14px; line-height: 1.6; }
-        </style>
-      </head>
-      <body>
-        <div class="container">
-          <div class="logo">Fov.it</div>
-          <div class="msg">❌ Script Not Found</div>
-          <div class="desc">Hindi mahanap ang script.</div>
-        </div>
-      </body>
-      </html>
-    `);
+    return res.send(`<!DOCTYPE html><html><head><title>Fov.it</title></head><body style="background:#0a0a0a;color:#ff6666;font-family:sans-serif;text-align:center;padding:50px;"><h1>❌ Script Not Found</h1></body></html>`);
   }
 
   const userAgent = (req.headers['user-agent'] || '').toLowerCase();
   const isBrowser = /mozilla|chrome|safari|firefox|edge|opera|trident/i.test(userAgent);
 
-  // ===== EXECUTOR (Roblox loadstring) =====
   if (!isBrowser) {
     res.setHeader('Content-Type', 'text/plain; charset=utf-8');
     return res.status(200).send(script.content);
   }
 
-  // ===== BROWSER =====
   const protocol = req.headers['x-forwarded-proto'] || req.protocol || 'https';
   const host = req.get('host');
   const loadstringCmd = `loadstring(game:HttpGet("${protocol}://${host}/api/raw?id=${id}"))()`;
@@ -261,7 +215,7 @@ app.get('/api/raw', async (req, res) => {
       <title>Fov.it — ${escapeHtml(script.title)}</title>
       <link rel="icon" type="image/svg+xml" href="/favicon.svg">
       <meta property="og:title" content="Fov.it — ${escapeHtml(script.title)}">
-      <meta property="og:description" content="Protektadong Lua script.">
+      <meta property="og:description" content="Protected Lua script.">
       <meta property="og:image" content="${protocol}://${host}/og-image.svg">
       <meta property="og:url" content="${protocol}://${host}/api/raw?id=${id}">
       <meta name="twitter:card" content="summary_large_image">
@@ -303,103 +257,23 @@ app.get('/api/raw', async (req, res) => {
           text-shadow: 0 0 30px rgba(0, 255, 136, 0.5);
         }
         .subtitle { color: #666; font-size: 12px; letter-spacing: 2px; text-transform: uppercase; }
-        .divider {
-          height: 1px;
-          background: linear-gradient(90deg, transparent, #222, transparent);
-          margin: 24px 0;
-        }
+        .divider { height: 1px; background: linear-gradient(90deg, transparent, #222, transparent); margin: 24px 0; }
         .title-section { margin-bottom: 24px; }
-        .title-section h1 {
-          color: #fff;
-          font-size: 22px;
-          margin-bottom: 6px;
-          display: flex;
-          align-items: center;
-          gap: 10px;
-        }
+        .title-section h1 { color: #fff; font-size: 22px; margin-bottom: 6px; display: flex; align-items: center; gap: 10px; }
         .title-section .meta { color: #666; font-size: 12px; }
-        .badge {
-          display: inline-block;
-          background: #00ff88;
-          color: #0a0a0a;
-          padding: 4px 12px;
-          border-radius: 20px;
-          font-size: 10px;
-          font-weight: bold;
-          text-transform: uppercase;
-          letter-spacing: 1px;
-        }
+        .badge { display: inline-block; background: #00ff88; color: #0a0a0a; padding: 4px 12px; border-radius: 20px; font-size: 10px; font-weight: bold; text-transform: uppercase; letter-spacing: 1px; }
         .badge-protected { background: #ff4444; color: #fff; }
         .code-section { margin-bottom: 20px; }
-        .code-label {
-          color: #666;
-          font-size: 11px;
-          margin-bottom: 8px;
-          text-transform: uppercase;
-          letter-spacing: 1px;
-        }
-        .code-box {
-          background: #0a0a0a;
-          border: 1px solid #00ff88;
-          border-radius: 10px;
-          padding: 18px;
-          font-family: 'Consolas', 'Monaco', monospace;
-          font-size: 12px;
-          color: #00ff88;
-          word-break: break-all;
-          line-height: 1.6;
-          position: relative;
-          overflow: hidden;
-        }
-        .code-box::before {
-          content: '';
-          position: absolute;
-          top: 0;
-          left: 0;
-          right: 0;
-          height: 2px;
-          background: linear-gradient(90deg, transparent, #00ff88, transparent);
-        }
-        .copy-btn {
-          width: 100%;
-          padding: 16px;
-          background: linear-gradient(135deg, #00ff88, #00cc6a);
-          color: #0a0a0a;
-          border: none;
-          border-radius: 10px;
-          font-size: 14px;
-          font-weight: bold;
-          cursor: pointer;
-          margin-bottom: 12px;
-          transition: all 0.3s ease;
-          letter-spacing: 1px;
-        }
-        .copy-btn:hover {
-          transform: translateY(-2px);
-          box-shadow: 0 8px 25px rgba(0, 255, 136, 0.4);
-        }
+        .code-label { color: #666; font-size: 11px; margin-bottom: 8px; text-transform: uppercase; letter-spacing: 1px; }
+        .code-box { background: #0a0a0a; border: 1px solid #00ff88; border-radius: 10px; padding: 18px; font-family: 'Consolas', 'Monaco', monospace; font-size: 12px; color: #00ff88; word-break: break-all; line-height: 1.6; position: relative; overflow: hidden; }
+        .code-box::before { content: ''; position: absolute; top: 0; left: 0; right: 0; height: 2px; background: linear-gradient(90deg, transparent, #00ff88, transparent); }
+        .copy-btn { width: 100%; padding: 16px; background: linear-gradient(135deg, #00ff88, #00cc6a); color: #0a0a0a; border: none; border-radius: 10px; font-size: 14px; font-weight: bold; cursor: pointer; margin-bottom: 12px; transition: all 0.3s ease; letter-spacing: 1px; }
+        .copy-btn:hover { transform: translateY(-2px); box-shadow: 0 8px 25px rgba(0, 255, 136, 0.4); }
         .copy-btn:active { transform: translateY(0); }
-        .copy-btn.copied {
-          background: linear-gradient(135deg, #0a2a0a, #0a2a0a);
-          color: #00ff88;
-          border: 1px solid #00ff88;
-        }
-        .note {
-          color: #666;
-          font-size: 12px;
-          text-align: center;
-          margin-top: 16px;
-          line-height: 1.6;
-        }
+        .copy-btn.copied { background: linear-gradient(135deg, #0a2a0a, #0a2a0a); color: #00ff88; border: 1px solid #00ff88; }
+        .note { color: #666; font-size: 12px; text-align: center; margin-top: 16px; line-height: 1.6; }
         .note strong { color: #00ff88; }
-        .footer {
-          text-align: center;
-          color: #444;
-          font-size: 11px;
-          margin-top: 24px;
-          padding-top: 20px;
-          border-top: 1px solid #1a1a1a;
-        }
+        .footer { text-align: center; color: #444; font-size: 11px; margin-top: 24px; padding-top: 20px; border-top: 1px solid #1a1a1a; }
         .footer a { color: #00ff88; text-decoration: none; }
         .footer a:hover { text-decoration: underline; }
       </style>
@@ -410,9 +284,7 @@ app.get('/api/raw', async (req, res) => {
           <div class="logo">Fov.it</div>
           <div class="subtitle">Script Protection System</div>
         </div>
-
         <div class="divider"></div>
-
         <div class="title-section">
           <h1>📋 ${escapeHtml(script.title)}</h1>
           <div class="meta">
@@ -420,23 +292,14 @@ app.get('/api/raw', async (req, res) => {
             <span style="margin-left: 10px;">ID: ${id}</span>
           </div>
         </div>
-
         <div class="code-section">
           <div class="code-label">Loadstring Command</div>
           <div class="code-box" id="code">${escapeHtml(loadstringCmd)}</div>
         </div>
-
         <button class="copy-btn" id="copyBtn" onclick="copyCode()">📋 COPY LOADSTRING</button>
-
-        <div class="note">
-          I-paste ito sa <strong>Roblox executor</strong> (Krnl, Fluxus, Synapse, etc.).
-        </div>
-
-        <div class="footer">
-          Protektado ng <a href="/">Fov.it</a> · ${new Date().getFullYear()}
-        </div>
+        <div class="note">Paste this into your <strong>Roblox executor</strong> (Krnl, Fluxus, Synapse, etc.).</div>
+        <div class="footer">Protected by <a href="/">Fov.it</a> · ${new Date().getFullYear()}</div>
       </div>
-
       <script>
         function copyCode() {
           const code = document.getElementById('code').textContent;
@@ -472,17 +335,32 @@ app.get('/api/raw', async (req, res) => {
 // ===== DELETE =====
 app.post('/api/delete', async (req, res) => {
   const auth = req.headers.authorization;
-  if (!auth || !auth.startsWith('Bearer ')) return res.status(401).json({ error: 'Hindi naka-login' });
+  if (!auth || !auth.startsWith('Bearer ')) return res.status(401).json({ error: 'Not logged in' });
 
+  let user;
   try {
-    jwt.verify(auth.slice(7), JWT_SECRET);
+    user = jwt.verify(auth.slice(7), JWT_SECRET);
   } catch {
     return res.status(401).json({ error: 'Invalid token' });
   }
 
   try {
     const { id } = req.body;
-    if (!id) return res.status(400).json({ error: 'ID kailangan' });
+    if (!id) return res.status(400).json({ error: 'ID required' });
+
+    // Check ownership
+    const { data: script } = await supabase
+      .from('scripts')
+      .select('user_id')
+      .eq('id', id)
+      .single();
+
+    if (!script) return res.status(404).json({ error: 'Script not found' });
+
+    // Owner can delete any, user can only delete own
+    if (user.role !== 'owner' && script.user_id !== user.id) {
+      return res.status(403).json({ error: 'You cannot delete this' });
+    }
 
     const { error } = await supabase.from('scripts').delete().eq('id', id);
     if (error) return res.status(500).json({ error: 'Failed to delete: ' + error.message });
@@ -496,11 +374,30 @@ app.post('/api/delete', async (req, res) => {
 // ===== EDIT =====
 app.post('/api/edit', async (req, res) => {
   const auth = req.headers.authorization;
-  if (!auth || !auth.startsWith('Bearer ')) return res.status(401).json({ error: 'Hindi naka-login' });
+  if (!auth || !auth.startsWith('Bearer ')) return res.status(401).json({ error: 'Not logged in' });
+
+  let user;
+  try {
+    user = jwt.verify(auth.slice(7), JWT_SECRET);
+  } catch {
+    return res.status(401).json({ error: 'Invalid token' });
+  }
 
   try {
     const { id, title, content } = req.body;
-    if (!id) return res.status(400).json({ error: 'ID kailangan' });
+    if (!id) return res.status(400).json({ error: 'ID required' });
+
+    const { data: script } = await supabase
+      .from('scripts')
+      .select('user_id')
+      .eq('id', id)
+      .single();
+
+    if (!script) return res.status(404).json({ error: 'Script not found' });
+
+    if (user.role !== 'owner' && script.user_id !== user.id) {
+      return res.status(403).json({ error: 'You cannot edit this' });
+    }
 
     const updates = { updated_at: new Date().toISOString() };
     if (title) updates.title = title;
@@ -524,7 +421,7 @@ app.post('/api/edit', async (req, res) => {
 // ===== SINGLE =====
 app.get('/api/single', async (req, res) => {
   const { id } = req.query;
-  if (!id) return res.status(400).json({ error: 'ID kailangan' });
+  if (!id) return res.status(400).json({ error: 'ID required' });
 
   const { data, error } = await supabase
     .from('scripts')
@@ -540,7 +437,7 @@ app.get('/api/single', async (req, res) => {
 // ===== ADMIN: USERS =====
 app.get('/api/admin/users', async (req, res) => {
   const auth = req.headers.authorization;
-  if (!auth || !auth.startsWith('Bearer ')) return res.status(401).json({ error: 'Hindi naka-login' });
+  if (!auth || !auth.startsWith('Bearer ')) return res.status(401).json({ error: 'Not logged in' });
 
   let user;
   try {
@@ -574,7 +471,7 @@ app.get('/api/admin/users', async (req, res) => {
 // ===== ADMIN: ALL SCRIPTS =====
 app.get('/api/admin/scripts', async (req, res) => {
   const auth = req.headers.authorization;
-  if (!auth || !auth.startsWith('Bearer ')) return res.status(401).json({ error: 'Hindi naka-login' });
+  if (!auth || !auth.startsWith('Bearer ')) return res.status(401).json({ error: 'Not logged in' });
 
   let user;
   try {
