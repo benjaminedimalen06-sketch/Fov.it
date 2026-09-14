@@ -1,9 +1,12 @@
 import { createClient } from '@supabase/supabase-js';
+import jwt from 'jsonwebtoken';
 
 const supabase = createClient(
   process.env.SUPABASE_URL,
   process.env.SUPABASE_SECRET
 );
+
+const JWT_SECRET = process.env.JWT_SECRET || 'fov-it-secret-change-me';
 
 function generateLink() {
   return Math.random().toString(36).substring(2, 10);
@@ -12,13 +15,26 @@ function generateLink() {
 export default async function handler(req, res) {
   res.setHeader('Access-Control-Allow-Origin', '*');
   res.setHeader('Access-Control-Allow-Methods', 'POST, OPTIONS');
-  res.setHeader('Access-Control-Allow-Headers', 'Content-Type');
+  res.setHeader('Access-Control-Allow-Headers', 'Content-Type, Authorization');
 
   if (req.method === 'OPTIONS') return res.status(200).end();
   if (req.method !== 'POST') return res.status(405).json({ error: 'Method not allowed' });
 
+  // Check auth
+  const auth = req.headers.authorization;
+  if (!auth || !auth.startsWith('Bearer ')) {
+    return res.status(401).json({ error: 'Hindi naka-login' });
+  }
+
+  let user;
   try {
-    const { title, content, owner } = req.body;
+    user = jwt.verify(auth.slice(7), JWT_SECRET);
+  } catch {
+    return res.status(401).json({ error: 'Invalid token' });
+  }
+
+  try {
+    const { title, content } = req.body;
 
     if (!title || !content) {
       return res.status(400).json({ error: 'Title at content ay kailangan' });
@@ -26,11 +42,10 @@ export default async function handler(req, res) {
 
     const link = generateLink();
 
-    // I-save sa Supabase kasama ang owner name
     const { data, error } = await supabase
       .from('scripts')
       .insert({
-        user_id: null,
+        user_id: user.id,
         title,
         content,
         public_link: link
@@ -50,8 +65,7 @@ export default async function handler(req, res) {
       success: true,
       script: data,
       raw_link: rawLink,
-      link: link,
-      owner: owner || 'unknown'
+      link: link
     });
 
   } catch (err) {
