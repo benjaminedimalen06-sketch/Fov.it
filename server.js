@@ -24,6 +24,17 @@ const supabase = createClient(
 
 const JWT_SECRET = process.env.JWT_SECRET || 'fov-it-secret-change-me';
 
+// ===== HELPER: ESCAPE HTML =====
+function escapeHtml(text) {
+  if (!text) return '';
+  return text
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;')
+    .replace(/'/g, '&#039;');
+}
+
 // ===== REGISTER =====
 app.post('/api/register', async (req, res) => {
   try {
@@ -169,11 +180,30 @@ app.get('/api/list', async (req, res) => {
 
 // ===== RAW =====
 app.get('/api/raw', async (req, res) => {
-  const { id, token } = req.query;
+  const { id } = req.query;
 
   if (!id) {
-    res.setHeader('Content-Type', 'text/plain; charset=utf-8');
-    return res.status(400).send('You cannot copy this script');
+    return res.send(`
+      <!DOCTYPE html>
+      <html>
+      <head>
+        <title>Fov.it</title>
+        <style>
+          * { margin: 0; padding: 0; box-sizing: border-box; }
+          body { font-family: 'Segoe UI', sans-serif; background: #0a0a0a; color: #fff; min-height: 100vh; display: flex; align-items: center; justify-content: center; padding: 20px; }
+          .container { background: #141414; padding: 40px; border-radius: 12px; border: 1px solid #222; width: 100%; max-width: 600px; text-align: center; }
+          .logo { color: #00ff88; font-size: 24px; font-weight: bold; margin-bottom: 8px; }
+          .msg { color: #ff6666; font-size: 18px; font-weight: bold; }
+        </style>
+      </head>
+      <body>
+        <div class="container">
+          <div class="logo">Fov.it</div>
+          <div class="msg">❌ Invalid Link</div>
+        </div>
+      </body>
+      </html>
+    `);
   }
 
   const { data: script, error } = await supabase
@@ -183,43 +213,116 @@ app.get('/api/raw', async (req, res) => {
     .maybeSingle();
 
   if (error || !script) {
-    res.setHeader('Content-Type', 'text/plain; charset=utf-8');
-    return res.status(404).send('-- Script not found');
+    return res.send(`
+      <!DOCTYPE html>
+      <html>
+      <head>
+        <title>Fov.it</title>
+        <style>
+          * { margin: 0; padding: 0; box-sizing: border-box; }
+          body { font-family: 'Segoe UI', sans-serif; background: #0a0a0a; color: #fff; min-height: 100vh; display: flex; align-items: center; justify-content: center; padding: 20px; }
+          .container { background: #141414; padding: 40px; border-radius: 12px; border: 1px solid #222; width: 100%; max-width: 600px; text-align: center; }
+          .logo { color: #00ff88; font-size: 24px; font-weight: bold; margin-bottom: 8px; }
+          .msg { color: #ff6666; font-size: 18px; font-weight: bold; }
+        </style>
+      </head>
+      <body>
+        <div class="container">
+          <div class="logo">Fov.it</div>
+          <div class="msg">❌ Script Not Found</div>
+        </div>
+      </body>
+      </html>
+    `);
   }
 
   const userAgent = (req.headers['user-agent'] || '').toLowerCase();
   const isBrowser = /mozilla|chrome|safari|firefox|edge|opera|trident/i.test(userAgent);
 
-  // Executor (Roblox loadstring)
+  // ===== EXECUTOR (Roblox loadstring) =====
   if (!isBrowser) {
     res.setHeader('Content-Type', 'text/plain; charset=utf-8');
     return res.status(200).send(script.content);
   }
 
-  // Browser
-  if (!token) {
-    res.setHeader('Content-Type', 'text/plain; charset=utf-8');
-    return res.status(200).send('You cannot copy this script');
-  }
+  // ===== BROWSER =====
+  const protocol = req.headers['x-forwarded-proto'] || req.protocol || 'https';
+  const host = req.get('host');
+  const loadstringCmd = `loadstring(game:HttpGet("${protocol}://${host}/api/raw?id=${id}"))()`;
 
-  let decoded;
-  try {
-    decoded = jwt.verify(token, JWT_SECRET);
-  } catch {
-    res.setHeader('Content-Type', 'text/plain; charset=utf-8');
-    return res.status(200).send('You cannot copy this script');
-  }
+  return res.send(`
+    <!DOCTYPE html>
+    <html>
+    <head>
+      <title>Fov.it — ${script.title}</title>
+      <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body { font-family: 'Segoe UI', sans-serif; background: #0a0a0a; color: #fff; min-height: 100vh; display: flex; align-items: center; justify-content: center; padding: 20px; }
+        .container { background: #141414; padding: 40px; border-radius: 12px; border: 1px solid #222; width: 100%; max-width: 700px; }
+        .logo { color: #00ff88; font-size: 24px; font-weight: bold; text-align: center; margin-bottom: 8px; }
+        .subtitle { color: #666; font-size: 12px; text-align: center; margin-bottom: 30px; }
+        h1 { color: #fff; font-size: 20px; margin-bottom: 8px; }
+        .meta { color: #666; font-size: 12px; margin-bottom: 20px; }
+        .code-box { background: #0a0a0a; border: 1px solid #00ff88; border-radius: 8px; padding: 16px; margin-bottom: 16px; font-family: 'Consolas', 'Monaco', monospace; font-size: 12px; color: #00ff88; word-break: break-all; line-height: 1.5; }
+        .copy-btn { width: 100%; padding: 14px; background: #00ff88; color: #0a0a0a; border: none; border-radius: 6px; font-size: 14px; font-weight: bold; cursor: pointer; margin-bottom: 12px; }
+        .copy-btn:hover { background: #00cc6a; }
+        .copy-btn.copied { background: #0a2a0a; color: #00ff88; border: 1px solid #00ff88; }
+        .note { color: #666; font-size: 12px; text-align: center; margin-top: 16px; line-height: 1.6; }
+        .footer { text-align: center; color: #666; font-size: 11px; margin-top: 20px; padding-top: 20px; border-top: 1px solid #222; }
+        .footer a { color: #00ff88; text-decoration: none; }
+      </style>
+    </head>
+    <body>
+      <div class="container">
+        <div class="logo">Fov.it</div>
+        <div class="subtitle">Script Protection System</div>
+        <h1>📋 ${escapeHtml(script.title)}</h1>
+        <p class="meta">I-copy ang loadstring command sa ibaba at i-paste sa Roblox executor.</p>
 
-  const isOwner = decoded.role === 'owner';
-  const isScriptOwner = decoded.id === script.user_id;
+        <div class="code-box" id="code">${escapeHtml(loadstringCmd)}</div>
 
-  if (!isOwner && !isScriptOwner) {
-    res.setHeader('Content-Type', 'text/plain; charset=utf-8');
-    return res.status(200).send('You cannot copy this script');
-  }
+        <button class="copy-btn" id="copyBtn" onclick="copyCode()">📋 Copy Loadstring</button>
 
-  res.setHeader('Content-Type', 'text/plain; charset=utf-8');
-  return res.status(200).send(script.content);
+        <div class="note">
+          I-paste ito sa Roblox executor (Krnl, Fluxus, Synapse, etc.).
+        </div>
+
+        <div class="footer">
+          Protektado ng <a href="/">Fov.it</a>
+        </div>
+      </div>
+
+      <script>
+        function copyCode() {
+          const code = document.getElementById('code').textContent;
+          navigator.clipboard.writeText(code).then(() => {
+            const btn = document.getElementById('copyBtn');
+            btn.textContent = '✅ Copied!';
+            btn.classList.add('copied');
+            setTimeout(() => {
+              btn.textContent = '📋 Copy Loadstring';
+              btn.classList.remove('copied');
+            }, 2000);
+          }).catch(() => {
+            const textarea = document.createElement('textarea');
+            textarea.value = code;
+            document.body.appendChild(textarea);
+            textarea.select();
+            document.execCommand('copy');
+            document.body.removeChild(textarea);
+            const btn = document.getElementById('copyBtn');
+            btn.textContent = '✅ Copied!';
+            btn.classList.add('copied');
+            setTimeout(() => {
+              btn.textContent = '📋 Copy Loadstring';
+              btn.classList.remove('copied');
+            }, 2000);
+          });
+        }
+      </script>
+    </body>
+    </html>
+  `);
 });
 
 // ===== DELETE =====
