@@ -358,7 +358,6 @@ app.post('/api/ai', async (req, res) => {
     if (action === 'generate') {
       const p = prompt.toLowerCase();
       
-      // UI versions first
       if ((p.includes('fly') || p.includes('flight')) && p.includes('ui')) {
         return res.status(200).json({ success: true, result: TEMPLATES.flyUI, action, instant: true });
       }
@@ -366,7 +365,6 @@ app.post('/api/ai', async (req, res) => {
         return res.status(200).json({ success: true, result: TEMPLATES.speedUI, action, instant: true });
       }
       
-      // Plain versions
       if (p.includes('fly') || p.includes('flight') || p.includes('flying')) {
         return res.status(200).json({ success: true, result: TEMPLATES.fly, action, instant: true });
       }
@@ -406,11 +404,13 @@ User request: ${prompt}`;
       systemPrompt = `Optimize this ${language} code. Return only optimized code:\n\n${prompt}`;
     }
 
+    // Updated free models (available sa OpenRouter ngayon)
     const MODELS = [
       'meta-llama/llama-3.3-70b-instruct:free',
-      'google/gemini-flash-1.5:free',
-      'mistralai/mistral-7b-instruct:free',
-      'qwen/qwen-2.5-72b-instruct:free'
+      'meta-llama/llama-3.1-8b-instruct:free',
+      'google/gemini-2.0-flash-exp:free',
+      'microsoft/phi-3-medium-128k-instruct:free',
+      'qwen/qwen-2.5-7b-instruct:free'
     ];
 
     let lastError = null;
