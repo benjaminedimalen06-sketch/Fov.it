@@ -528,17 +528,28 @@ app.post('/api/ai', async (req, res) => {
 
     let systemPrompt = '';
     if (action === 'generate') {
-      systemPrompt = `You are an expert ${language} developer. Generate clean, working, and well-commented ${language} code based on the user's request. Only respond with the code, no explanations.`;
+      systemPrompt = `You are an expert ${language} developer.
+
+RULES:
+1. Only respond with the code. No explanations, no markdown code blocks (no \`\`\`), no "Here is...".
+2. Make the code complete and runnable.
+3. Add short comments explaining key parts.
+4. Use modern syntax for ${language}.
+5. For Lua/Roblox: use game:GetService() and Roblox conventions.
+6. For JavaScript: use ES6+, async/await if needed.
+7. For Python: use Python 3.
+
+User request: ${prompt}`;
     } else if (action === 'explain') {
-      systemPrompt = `You are an expert ${language} developer. Explain the following ${language} code in simple terms.`;
+      systemPrompt = `You are an expert ${language} developer. Explain the following ${language} code in simple terms. Break down what each part does.`;
     } else if (action === 'fix') {
-      systemPrompt = `You are an expert ${language} developer. Fix any bugs in the following ${language} code. Return only the corrected code.`;
+      systemPrompt = `You are an expert ${language} developer. Fix any bugs in the following ${language} code. Return only the corrected code, no explanations, no markdown.`;
     } else if (action === 'optimize') {
-      systemPrompt = `You are an expert ${language} developer. Optimize the following ${language} code. Return only the optimized code.`;
+      systemPrompt = `You are an expert ${language} developer. Optimize the following ${language} code for performance and readability. Return only the optimized code, no explanations, no markdown.`;
     }
 
     const fullPrompt = action === 'generate'
-      ? `${systemPrompt}\n\nUser request: ${prompt}`
+      ? systemPrompt
       : `${systemPrompt}\n\nCode:\n${prompt}`;
 
     const response = await fetch(
@@ -548,7 +559,7 @@ app.post('/api/ai', async (req, res) => {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           contents: [{ parts: [{ text: fullPrompt }] }],
-          generationConfig: { temperature: 0.7, maxOutputTokens: 2048 }
+          generationConfig: { temperature: 0.7, maxOutputTokens: 4096 }
         })
       }
     );
@@ -563,10 +574,9 @@ app.post('/api/ai', async (req, res) => {
     const generatedText = data.candidates?.[0]?.content?.parts?.[0]?.text || '';
     if (!generatedText) return res.status(500).json({ error: 'AI returned empty response' });
 
-    const cleaned = generatedText
-      .replace(/^```[\w]*\n?/gm, '')
-      .replace(/```$/gm, '')
-      .trim();
+    let cleaned = generatedText.trim();
+    // Remove markdown code blocks
+    cleaned = cleaned.replace(/^```[\w]*\s*\n?/gm, '').replace(/\n?```\s*$/gm, '').trim();
 
     return res.status(200).json({ success: true, result: cleaned, action });
   } catch (err) {
