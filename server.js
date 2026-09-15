@@ -60,27 +60,19 @@ local function toggleFly()
         bodyVelocity.MaxForce = Vector3.new(math.huge, math.huge, math.huge)
         bodyVelocity.Velocity = Vector3.zero
         bodyVelocity.Parent = hrp
-        
         RunService.RenderStepped:Connect(function()
             if not isFlying or not bodyVelocity or not bodyVelocity.Parent then return end
-            local moveDirection = getFlightDirection()
-            bodyVelocity.Velocity = moveDirection * flySpeed
+            bodyVelocity.Velocity = getFlightDirection() * flySpeed
         end)
     else
-        if bodyVelocity then
-            bodyVelocity:Destroy()
-            bodyVelocity = nil
-        end
+        if bodyVelocity then bodyVelocity:Destroy(); bodyVelocity = nil end
     end
 end
 
 UserInputService.InputBegan:Connect(function(input, processed)
     if processed then return end
-    if input.KeyCode == Enum.KeyCode.F then
-        toggleFly()
-    elseif isFlying then
-        activeKeys[input.KeyCode] = true
-    end
+    if input.KeyCode == Enum.KeyCode.F then toggleFly()
+    elseif isFlying then activeKeys[input.KeyCode] = true end
 end)
 
 UserInputService.InputEnded:Connect(function(input)
@@ -121,37 +113,41 @@ end)`,
 
   esp: `-- ESP Script
 local Players = game:GetService("Players")
-local RunService = game:GetService("RunService")
 local Workspace = game:GetService("Workspace")
 
 local player = Players.LocalPlayer
-local camera = Workspace.CurrentCamera
 
 local function createESP(targetPlayer)
+    if not targetPlayer.Character then return end
     local highlight = Instance.new("Highlight")
     highlight.Name = "ESP_" .. targetPlayer.Name
     highlight.FillColor = Color3.fromRGB(255, 0, 0)
     highlight.OutlineColor = Color3.fromRGB(255, 255, 255)
     highlight.FillTransparency = 0.5
-    highlight.OutlineTransparency = 0
     highlight.Parent = targetPlayer.Character
 end
 
 for _, p in pairs(Players:GetPlayers()) do
-    if p ~= player and p.Character then
-        createESP(p)
-    end
+    if p ~= player then createESP(p) end
 end
 
 Players.PlayerAdded:Connect(function(p)
-    p.CharacterAdded:Connect(function(char)
-        wait(1)
-        createESP(p)
-    end)
+    p.CharacterAdded:Connect(function() wait(1); createESP(p) end)
 end)`
 };
 
-// ===== AI GENERATOR =====
+// ===== HELPER: ESCAPE HTML =====
+function escapeHtml(text) {
+  if (!text) return '';
+  return text.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;').replace(/'/g, '&#039;');
+}
+
+// ===== FAVICON =====
+app.get('/favicon.ico', (req, res) => res.sendFile(path.join(__dirname, 'favicon.svg')));
+app.get('/favicon.svg', (req, res) => res.sendFile(path.join(__dirname, 'favicon.svg')));
+app.get('/og-image.svg', (req, res) => res.sendFile(path.join(__dirname, 'og-image.svg')));
+
+// ===== AI GENERATOR (OpenRouter — libre, maraming models) =====
 app.post('/api/ai', async (req, res) => {
   const auth = req.headers.authorization;
   if (!auth || !auth.startsWith('Bearer ')) return res.status(401).json({ error: 'Not logged in' });
@@ -159,12 +155,11 @@ app.post('/api/ai', async (req, res) => {
 
   try {
     const { prompt, language = 'lua', action = 'generate' } = req.body;
-    if (!prompt || prompt.trim().length < 3) return res.status(400).json({ error: 'Prompt is required' });
+    if (!prompt || prompt.trim().length < 3) return res.status(400).json({ error: 'Prompt is required (min 3 characters)' });
 
     // ===== INSTANT TEMPLATES (para sa common requests) =====
     if (action === 'generate') {
       const p = prompt.toLowerCase();
-      
       if (p.includes('fly') || p.includes('flight') || p.includes('flying')) {
         return res.status(200).json({ success: true, result: TEMPLATES.fly, action, instant: true });
       }
@@ -179,54 +174,86 @@ app.post('/api/ai', async (req, res) => {
       }
     }
 
-    // ===== AI FALLBACK (kung walang template) =====
-    const GEMINI_API_KEY = process.env.GEMINI_API_KEY;
-    if (!GEMINI_API_KEY) return res.status(500).json({ error: 'Gemini API key not configured' });
-
-    const GEMINI_MODELS = ['gemini-2.5-flash', 'gemini-flash-latest', 'gemini-2.5-flash-lite', 'gemini-3.5-flash'];
+    // ===== AI FALLBACK (OpenRouter) =====
+    const OPENROUTER_API_KEY = process.env.OPENROUTER_API_KEY;
+    if (!OPENROUTER_API_KEY) return res.status(500).json({ error: 'OpenRouter API key not configured. Add OPENROUTER_API_KEY in Render.' });
 
     let systemPrompt = '';
     if (action === 'generate') {
-      systemPrompt = `You are an expert ${language} developer. Only respond with the code. No explanations, no markdown. Use modern syntax. For Lua/Roblox use game:GetService(). User request: ${prompt}`;
+      systemPrompt = `You are an expert ${language} developer. Generate clean, working, complete ${language} code.
+
+RULES:
+- Only respond with the code. No explanations, no markdown code blocks, no "Here is...".
+- Complete and runnable code.
+- Add short comments.
+- For Lua/Roblox: use game:GetService() and Roblox conventions.
+- For JavaScript: use ES6+, async/await if needed.
+- For Python: use Python 3.
+
+User request: ${prompt}`;
     } else if (action === 'explain') {
-      systemPrompt = `Explain this ${language} code in simple terms:\n${prompt}`;
+      systemPrompt = `Explain this ${language} code in simple terms:\n\n${prompt}`;
     } else if (action === 'fix') {
-      systemPrompt = `Fix bugs in this ${language} code. Return only corrected code:\n${prompt}`;
+      systemPrompt = `Fix all bugs in this ${language} code. Return only the corrected code:\n\n${prompt}`;
     } else if (action === 'optimize') {
-      systemPrompt = `Optimize this ${language} code. Return only optimized code:\n${prompt}`;
+      systemPrompt = `Optimize this ${language} code. Return only the optimized code:\n\n${prompt}`;
     }
+
+    // Subukan ang bawat libreng model hanggang may gumana
+    const MODELS = [
+      'meta-llama/llama-3.3-70b-instruct:free',
+      'google/gemini-flash-1.5:free',
+      'mistralai/mistral-7b-instruct:free',
+      'qwen/qwen-2.5-72b-instruct:free'
+    ];
 
     let lastError = null;
     let generatedText = null;
 
-    for (const model of GEMINI_MODELS) {
+    for (const model of MODELS) {
       try {
-        const response = await fetch(
-          `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${GEMINI_API_KEY}`,
-          {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({
-              contents: [{ parts: [{ text: systemPrompt }] }],
-              generationConfig: { temperature: 0.7, maxOutputTokens: 4096 }
-            })
-          }
-        );
+        console.log(`Trying model: ${model}`);
+        const response = await fetch('https://openrouter.ai/api/v1/chat/completions', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'Authorization': `Bearer ${OPENROUTER_API_KEY}`,
+            'HTTP-Referer': 'https://fov-it.onrender.com',
+            'X-Title': 'Fov.it AI Generator'
+          },
+          body: JSON.stringify({
+            model: model,
+            messages: [
+              { role: 'system', content: systemPrompt },
+              { role: 'user', content: prompt }
+            ],
+            temperature: 0.6,
+            max_tokens: 4096
+          })
+        });
 
         if (response.ok) {
           const data = await response.json();
-          generatedText = data.candidates?.[0]?.content?.parts?.[0]?.text || '';
-          if (generatedText) break;
+          generatedText = data.choices?.[0]?.message?.content || '';
+          if (generatedText) {
+            console.log(`✅ Success with model: ${model}`);
+            break;
+          }
         } else {
+          const errorText = await response.text();
+          console.error(`Model ${model} failed:`, errorText);
           lastError = `${model}: ${response.status}`;
         }
       } catch (err) {
+        console.error(`Model ${model} error:`, err.message);
         lastError = `${model}: ${err.message}`;
       }
     }
 
     if (!generatedText) {
-      return res.status(503).json({ error: 'AI is busy. Try a simpler prompt like "fly script" or "speed script".' });
+      return res.status(503).json({ 
+        error: 'AI is busy right now. Please try again in a few seconds. (' + (lastError || 'unknown') + ')' 
+      });
     }
 
     let cleaned = generatedText.trim();
@@ -234,6 +261,7 @@ app.post('/api/ai', async (req, res) => {
 
     return res.status(200).json({ success: true, result: cleaned, action });
   } catch (err) {
+    console.error('Server error:', err);
     return res.status(500).json({ error: 'Server error: ' + err.message });
   }
 });
