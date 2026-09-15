@@ -33,7 +33,7 @@ app.get('/favicon.ico', (req, res) => res.sendFile(path.join(__dirname, 'favicon
 app.get('/favicon.svg', (req, res) => res.sendFile(path.join(__dirname, 'favicon.svg')));
 app.get('/og-image.svg', (req, res) => res.sendFile(path.join(__dirname, 'og-image.svg')));
 
-// ===== AI CHAT (Gemini 2.5 Flash — 65K output tokens) =====
+// ===== AI CHAT (Gemini — available models only) =====
 app.post('/api/ai', async (req, res) => {
   const auth = req.headers.authorization;
   if (!auth || !auth.startsWith('Bearer ')) return res.status(401).json({ error: 'Not logged in' });
@@ -46,36 +46,64 @@ app.post('/api/ai', async (req, res) => {
     const { prompt } = req.body;
     if (!prompt || prompt.trim().length < 1) return res.status(400).json({ error: 'Message is required' });
 
-    const systemPrompt = `You are Fov.it AI — a helpful assistant. Be concise but complete. Use markdown for code blocks with language name (triple backticks). For long code, write it COMPLETELY without truncation. Add comments.
+    const systemPrompt = `You are Fov.it AI — a helpful assistant.
+
+CRITICAL RULES:
+- Write COMPLETE code without truncation. Never stop in the middle.
+- Use markdown code blocks with language name.
+- If code is very long, write it all.
+- Add comments.
 
 User: ${prompt}`;
 
-    const response = await fetch(
-      `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=${GEMINI_API_KEY}`,
-      {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          contents: [{ parts: [{ text: systemPrompt }] }],
-          generationConfig: {
-            temperature: 0.7,
-            maxOutputTokens: 65536,
-            topP: 0.95,
-            topK: 40
-          }
-        })
-      }
-    );
+    // Available models lang
+    const models = [
+      'gemini-2.5-flash',
+      'gemini-flash-latest',
+      'gemini-2.5-flash-lite',
+      'gemini-3.5-flash'
+    ];
 
-    if (!response.ok) {
-      const errorText = await response.text();
-      console.error('Gemini API error:', errorText);
-      return res.status(500).json({ error: 'AI request failed: ' + response.status });
+    let generatedText = null;
+    let lastError = null;
+
+    for (const model of models) {
+      try {
+        console.log(`Trying: ${model}`);
+        const response = await fetch(
+          `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${GEMINI_API_KEY}`,
+          {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              contents: [{ parts: [{ text: systemPrompt }] }],
+              generationConfig: {
+                temperature: 0.7,
+                maxOutputTokens: 65536,
+                topP: 0.95,
+                topK: 40
+              }
+            })
+          }
+        );
+
+        if (response.ok) {
+          const data = await response.json();
+          generatedText = data.candidates?.[0]?.content?.parts?.[0]?.text || '';
+          if (generatedText) { console.log(`✅ Success: ${model} (${generatedText.length} chars)`); break; }
+        } else {
+          console.error(`❌ ${model}: ${response.status}`);
+          lastError = `${model}: ${response.status}`;
+        }
+      } catch (err) {
+        console.error(`❌ ${model}: ${err.message}`);
+        lastError = `${model}: ${err.message}`;
+      }
     }
 
-    const data = await response.json();
-    const generatedText = data.candidates?.[0]?.content?.parts?.[0]?.text || '';
-    if (!generatedText) return res.status(500).json({ error: 'AI returned empty response' });
+    if (!generatedText) {
+      return res.status(503).json({ error: 'AI is busy. Try again. (' + (lastError || 'failed') + ')' });
+    }
 
     return res.status(200).json({ success: true, result: generatedText });
   } catch (err) {
