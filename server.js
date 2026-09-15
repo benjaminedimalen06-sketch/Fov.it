@@ -24,12 +24,12 @@ const supabase = createClient(
 
 const JWT_SECRET = process.env.JWT_SECRET || 'fov-it-secret-change-me';
 
-// Fallback models — kung mag-503 ang isa, susubukan ang susunod
+// Fallback models — base sa available models ng iyong API key
 const GEMINI_MODELS = [
   'gemini-2.5-flash',
   'gemini-flash-latest',
   'gemini-2.5-flash-lite',
-  'gemini-2.5-pro'
+  'gemini-3.5-flash'
 ];
 
 function escapeHtml(text) {
