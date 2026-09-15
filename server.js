@@ -164,7 +164,6 @@ app.get('/api/list', async (req, res) => {
       .select('id, title, public_link, user_id, created_at, updated_at')
       .order('created_at', { ascending: false });
 
-    // Owner sees all, user sees own only
     if (!isOwner) {
       query = query.eq('user_id', user.id);
     }
@@ -348,7 +347,6 @@ app.post('/api/delete', async (req, res) => {
     const { id } = req.body;
     if (!id) return res.status(400).json({ error: 'ID required' });
 
-    // Check ownership
     const { data: script } = await supabase
       .from('scripts')
       .select('user_id')
@@ -357,7 +355,6 @@ app.post('/api/delete', async (req, res) => {
 
     if (!script) return res.status(404).json({ error: 'Script not found' });
 
-    // Owner can delete any, user can only delete own
     if (user.role !== 'owner' && script.user_id !== user.id) {
       return res.status(403).json({ error: 'You cannot delete this' });
     }
@@ -509,6 +506,75 @@ app.get('/api/admin/scripts', async (req, res) => {
   }
 });
 
+// ===== AI GENERATOR (Gemini) =====
+app.post('/api/ai', async (req, res) => {
+  const auth = req.headers.authorization;
+  if (!auth || !auth.startsWith('Bearer ')) return res.status(401).json({ error: 'Not logged in' });
+
+  try {
+    jwt.verify(auth.slice(7), JWT_SECRET);
+  } catch {
+    return res.status(401).json({ error: 'Invalid token' });
+  }
+
+  const GEMINI_API_KEY = process.env.GEMINI_API_KEY;
+  if (!GEMINI_API_KEY) return res.status(500).json({ error: 'Gemini API key not configured' });
+
+  try {
+    const { prompt, language = 'javascript', action = 'generate' } = req.body;
+    if (!prompt || prompt.trim().length < 3) {
+      return res.status(400).json({ error: 'Prompt is required (min 3 characters)' });
+    }
+
+    let systemPrompt = '';
+    if (action === 'generate') {
+      systemPrompt = `You are an expert ${language} developer. Generate clean, working, and well-commented ${language} code based on the user's request. Only respond with the code, no explanations.`;
+    } else if (action === 'explain') {
+      systemPrompt = `You are an expert ${language} developer. Explain the following ${language} code in simple terms.`;
+    } else if (action === 'fix') {
+      systemPrompt = `You are an expert ${language} developer. Fix any bugs in the following ${language} code. Return only the corrected code.`;
+    } else if (action === 'optimize') {
+      systemPrompt = `You are an expert ${language} developer. Optimize the following ${language} code. Return only the optimized code.`;
+    }
+
+    const fullPrompt = action === 'generate'
+      ? `${systemPrompt}\n\nUser request: ${prompt}`
+      : `${systemPrompt}\n\nCode:\n${prompt}`;
+
+    const response = await fetch(
+      `https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=${GEMINI_API_KEY}`,
+      {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          contents: [{ parts: [{ text: fullPrompt }] }],
+          generationConfig: { temperature: 0.7, maxOutputTokens: 2048 }
+        })
+      }
+    );
+
+    if (!response.ok) {
+      const errorText = await response.text();
+      console.error('Gemini API error:', errorText);
+      return res.status(500).json({ error: 'AI request failed: ' + response.status });
+    }
+
+    const data = await response.json();
+    const generatedText = data.candidates?.[0]?.content?.parts?.[0]?.text || '';
+    if (!generatedText) return res.status(500).json({ error: 'AI returned empty response' });
+
+    const cleaned = generatedText
+      .replace(/^```[\w]*\n?/gm, '')
+      .replace(/```$/gm, '')
+      .trim();
+
+    return res.status(200).json({ success: true, result: cleaned, action });
+  } catch (err) {
+    console.error('Server error:', err);
+    return res.status(500).json({ error: 'Server error: ' + err.message });
+  }
+});
+
 // ===== SERVE HTML =====
 app.get('/', (req, res) => res.sendFile(path.join(__dirname, 'index.html')));
 app.get('/register.html', (req, res) => res.sendFile(path.join(__dirname, 'register.html')));
@@ -516,6 +582,7 @@ app.get('/dashboard.html', (req, res) => res.sendFile(path.join(__dirname, 'dash
 app.get('/editor.html', (req, res) => res.sendFile(path.join(__dirname, 'editor.html')));
 app.get('/view.html', (req, res) => res.sendFile(path.join(__dirname, 'view.html')));
 app.get('/admin.html', (req, res) => res.sendFile(path.join(__dirname, 'admin.html')));
+app.get('/ai.html', (req, res) => res.sendFile(path.join(__dirname, 'ai.html')));
 app.get('/s/:link', (req, res) => res.sendFile(path.join(__dirname, 'view.html')));
 
 app.listen(PORT, () => {
