@@ -24,7 +24,7 @@ const supabase = createClient(
 
 const JWT_SECRET = process.env.JWT_SECRET || 'fov-it-secret-change-me';
 
-// ===== INSTANT TEMPLATES (walang AI wait) =====
+// ===== INSTANT TEMPLATES =====
 const TEMPLATES = {
   fly: `-- Fly Script (press F to toggle)
 local Players = game:GetService("Players")
@@ -113,7 +113,6 @@ end)`,
 
   esp: `-- ESP Script
 local Players = game:GetService("Players")
-local Workspace = game:GetService("Workspace")
 
 local player = Players.LocalPlayer
 
@@ -133,10 +132,208 @@ end
 
 Players.PlayerAdded:Connect(function(p)
     p.CharacterAdded:Connect(function() wait(1); createESP(p) end)
+end)`,
+
+  speedUI: `-- Speed UI Script (with GUI)
+local Players = game:GetService("Players")
+local UserInputService = game:GetService("UserInputService")
+
+local player = Players.LocalPlayer
+local character = player.Character or player.CharacterAdded:Wait()
+local humanoid = character:WaitForChild("Humanoid")
+
+local normalSpeed = 16
+local isFast = false
+
+local screenGui = Instance.new("ScreenGui")
+screenGui.Name = "SpeedUI"
+screenGui.ResetOnSpawn = false
+screenGui.Parent = player:WaitForChild("PlayerGui")
+
+local mainFrame = Instance.new("Frame")
+mainFrame.Size = UDim2.new(0, 200, 0, 120)
+mainFrame.Position = UDim2.new(0.5, -100, 0.5, -60)
+mainFrame.BackgroundColor3 = Color3.fromRGB(20, 20, 20)
+mainFrame.BorderSizePixel = 0
+mainFrame.Active = true
+mainFrame.Draggable = true
+mainFrame.Parent = screenGui
+
+local corner = Instance.new("UICorner")
+corner.CornerRadius = UDim.new(0, 10)
+corner.Parent = mainFrame
+
+local title = Instance.new("TextLabel")
+title.Size = UDim2.new(1, 0, 0, 30)
+title.BackgroundColor3 = Color3.fromRGB(0, 255, 136)
+title.BorderSizePixel = 0
+title.Text = "⚡ Speed UI"
+title.TextColor3 = Color3.fromRGB(10, 10, 10)
+title.Font = Enum.Font.GothamBold
+title.TextSize = 14
+title.Parent = mainFrame
+
+local titleCorner = Instance.new("UICorner")
+titleCorner.CornerRadius = UDim.new(0, 10)
+titleCorner.Parent = title
+
+local statusLabel = Instance.new("TextLabel")
+statusLabel.Size = UDim2.new(1, -20, 0, 20)
+statusLabel.Position = UDim2.new(0, 10, 0, 40)
+statusLabel.BackgroundTransparency = 1
+statusLabel.Text = "Speed: Normal (16)"
+statusLabel.TextColor3 = Color3.fromRGB(255, 255, 255)
+statusLabel.Font = Enum.Font.Gotham
+statusLabel.TextSize = 12
+statusLabel.Parent = mainFrame
+
+local toggleBtn = Instance.new("TextButton")
+toggleBtn.Size = UDim2.new(1, -20, 0, 35)
+toggleBtn.Position = UDim2.new(0, 10, 0, 70)
+toggleBtn.BackgroundColor3 = Color3.fromRGB(0, 255, 136)
+toggleBtn.BorderSizePixel = 0
+toggleBtn.Text = "Toggle Speed (F)"
+toggleBtn.TextColor3 = Color3.fromRGB(10, 10, 10)
+toggleBtn.Font = Enum.Font.GothamBold
+toggleBtn.TextSize = 13
+toggleBtn.Parent = mainFrame
+
+local btnCorner = Instance.new("UICorner")
+btnCorner.CornerRadius = UDim.new(0, 8)
+btnCorner.Parent = toggleBtn
+
+local function toggleSpeed()
+    isFast = not isFast
+    humanoid.WalkSpeed = isFast and 100 or normalSpeed
+    statusLabel.Text = "Speed: " .. (isFast and "Fast (100)" or "Normal (16)")
+    toggleBtn.Text = isFast and "Disable Speed (F)" or "Toggle Speed (F)"
+end
+
+toggleBtn.MouseButton1Click:Connect(toggleSpeed)
+
+UserInputService.InputBegan:Connect(function(input, processed)
+    if processed then return end
+    if input.KeyCode == Enum.KeyCode.F then toggleSpeed() end
+end)`,
+
+  flyUI: `-- Fly UI Script (with GUI)
+local Players = game:GetService("Players")
+local UserInputService = game:GetService("UserInputService")
+local RunService = game:GetService("RunService")
+local Workspace = game:GetService("Workspace")
+
+local player = Players.LocalPlayer
+local character = player.Character or player.CharacterAdded:Wait()
+local hrp = character:WaitForChild("HumanoidRootPart")
+local camera = Workspace.CurrentCamera
+
+local isFlying = false
+local flySpeed = 50
+local activeKeys = {}
+local bodyVelocity = nil
+
+local screenGui = Instance.new("ScreenGui")
+screenGui.Name = "FlyUI"
+screenGui.ResetOnSpawn = false
+screenGui.Parent = player:WaitForChild("PlayerGui")
+
+local mainFrame = Instance.new("Frame")
+mainFrame.Size = UDim2.new(0, 200, 0, 130)
+mainFrame.Position = UDim2.new(0.5, -100, 0.5, -65)
+mainFrame.BackgroundColor3 = Color3.fromRGB(20, 20, 20)
+mainFrame.BorderSizePixel = 0
+mainFrame.Active = true
+mainFrame.Draggable = true
+mainFrame.Parent = screenGui
+
+local corner = Instance.new("UICorner")
+corner.CornerRadius = UDim.new(0, 10)
+corner.Parent = mainFrame
+
+local title = Instance.new("TextLabel")
+title.Size = UDim2.new(1, 0, 0, 30)
+title.BackgroundColor3 = Color3.fromRGB(0, 255, 136)
+title.BorderSizePixel = 0
+title.Text = "✈️ Fly UI"
+title.TextColor3 = Color3.fromRGB(10, 10, 10)
+title.Font = Enum.Font.GothamBold
+title.TextSize = 14
+title.Parent = mainFrame
+
+local titleCorner = Instance.new("UICorner")
+titleCorner.CornerRadius = UDim.new(0, 10)
+titleCorner.Parent = title
+
+local statusLabel = Instance.new("TextLabel")
+statusLabel.Size = UDim2.new(1, -20, 0, 20)
+statusLabel.Position = UDim2.new(0, 10, 0, 40)
+statusLabel.BackgroundTransparency = 1
+statusLabel.Text = "Status: Off"
+statusLabel.TextColor3 = Color3.fromRGB(255, 255, 255)
+statusLabel.Font = Enum.Font.Gotham
+statusLabel.TextSize = 12
+statusLabel.Parent = mainFrame
+
+local toggleBtn = Instance.new("TextButton")
+toggleBtn.Size = UDim2.new(1, -20, 0, 35)
+toggleBtn.Position = UDim2.new(0, 10, 0, 70)
+toggleBtn.BackgroundColor3 = Color3.fromRGB(0, 255, 136)
+toggleBtn.BorderSizePixel = 0
+toggleBtn.Text = "Toggle Fly (F)"
+toggleBtn.TextColor3 = Color3.fromRGB(10, 10, 10)
+toggleBtn.Font = Enum.Font.GothamBold
+toggleBtn.TextSize = 13
+toggleBtn.Parent = mainFrame
+
+local btnCorner = Instance.new("UICorner")
+btnCorner.CornerRadius = UDim.new(0, 8)
+btnCorner.Parent = toggleBtn
+
+local function getFlightDirection()
+    local direction = Vector3.zero
+    if activeKeys[Enum.KeyCode.W] then direction += camera.CFrame.LookVector end
+    if activeKeys[Enum.KeyCode.S] then direction -= camera.CFrame.LookVector end
+    if activeKeys[Enum.KeyCode.A] then direction -= camera.CFrame.RightVector end
+    if activeKeys[Enum.KeyCode.D] then direction += camera.CFrame.RightVector end
+    if activeKeys[Enum.KeyCode.Space] then direction += Vector3.new(0, 1, 0) end
+    if activeKeys[Enum.KeyCode.LeftShift] then direction -= Vector3.new(0, 1, 0) end
+    return direction.Magnitude > 0 and direction.Unit or Vector3.zero
+end
+
+local function toggleFly()
+    isFlying = not isFlying
+    if isFlying then
+        bodyVelocity = Instance.new("BodyVelocity")
+        bodyVelocity.MaxForce = Vector3.new(math.huge, math.huge, math.huge)
+        bodyVelocity.Velocity = Vector3.zero
+        bodyVelocity.Parent = hrp
+        RunService.RenderStepped:Connect(function()
+            if not isFlying or not bodyVelocity or not bodyVelocity.Parent then return end
+            bodyVelocity.Velocity = getFlightDirection() * flySpeed
+        end)
+        statusLabel.Text = "Status: On"
+        toggleBtn.Text = "Disable Fly (F)"
+    else
+        if bodyVelocity then bodyVelocity:Destroy(); bodyVelocity = nil end
+        statusLabel.Text = "Status: Off"
+        toggleBtn.Text = "Toggle Fly (F)"
+    end
+end
+
+toggleBtn.MouseButton1Click:Connect(toggleFly)
+
+UserInputService.InputBegan:Connect(function(input, processed)
+    if processed then return end
+    if input.KeyCode == Enum.KeyCode.F then toggleFly()
+    elseif isFlying then activeKeys[input.KeyCode] = true end
+end)
+
+UserInputService.InputEnded:Connect(function(input)
+    activeKeys[input.KeyCode] = nil
 end)`
 };
 
-// ===== HELPER: ESCAPE HTML =====
+// ===== HELPER =====
 function escapeHtml(text) {
   if (!text) return '';
   return text.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;').replace(/'/g, '&#039;');
@@ -147,7 +344,7 @@ app.get('/favicon.ico', (req, res) => res.sendFile(path.join(__dirname, 'favicon
 app.get('/favicon.svg', (req, res) => res.sendFile(path.join(__dirname, 'favicon.svg')));
 app.get('/og-image.svg', (req, res) => res.sendFile(path.join(__dirname, 'og-image.svg')));
 
-// ===== AI GENERATOR (OpenRouter — libre, maraming models) =====
+// ===== AI GENERATOR (OpenRouter) =====
 app.post('/api/ai', async (req, res) => {
   const auth = req.headers.authorization;
   if (!auth || !auth.startsWith('Bearer ')) return res.status(401).json({ error: 'Not logged in' });
@@ -157,9 +354,19 @@ app.post('/api/ai', async (req, res) => {
     const { prompt, language = 'lua', action = 'generate' } = req.body;
     if (!prompt || prompt.trim().length < 3) return res.status(400).json({ error: 'Prompt is required (min 3 characters)' });
 
-    // ===== INSTANT TEMPLATES (para sa common requests) =====
+    // ===== INSTANT TEMPLATES (UI check muna) =====
     if (action === 'generate') {
       const p = prompt.toLowerCase();
+      
+      // UI versions first
+      if ((p.includes('fly') || p.includes('flight')) && p.includes('ui')) {
+        return res.status(200).json({ success: true, result: TEMPLATES.flyUI, action, instant: true });
+      }
+      if ((p.includes('speed') || p.includes('fast')) && p.includes('ui')) {
+        return res.status(200).json({ success: true, result: TEMPLATES.speedUI, action, instant: true });
+      }
+      
+      // Plain versions
       if (p.includes('fly') || p.includes('flight') || p.includes('flying')) {
         return res.status(200).json({ success: true, result: TEMPLATES.fly, action, instant: true });
       }
@@ -183,7 +390,7 @@ app.post('/api/ai', async (req, res) => {
       systemPrompt = `You are an expert ${language} developer. Generate clean, working, complete ${language} code.
 
 RULES:
-- Only respond with the code. No explanations, no markdown code blocks, no "Here is...".
+- Only respond with the code. No explanations, no markdown code blocks.
 - Complete and runnable code.
 - Add short comments.
 - For Lua/Roblox: use game:GetService() and Roblox conventions.
@@ -194,12 +401,11 @@ User request: ${prompt}`;
     } else if (action === 'explain') {
       systemPrompt = `Explain this ${language} code in simple terms:\n\n${prompt}`;
     } else if (action === 'fix') {
-      systemPrompt = `Fix all bugs in this ${language} code. Return only the corrected code:\n\n${prompt}`;
+      systemPrompt = `Fix all bugs in this ${language} code. Return only corrected code:\n\n${prompt}`;
     } else if (action === 'optimize') {
-      systemPrompt = `Optimize this ${language} code. Return only the optimized code:\n\n${prompt}`;
+      systemPrompt = `Optimize this ${language} code. Return only optimized code:\n\n${prompt}`;
     }
 
-    // Subukan ang bawat libreng model hanggang may gumana
     const MODELS = [
       'meta-llama/llama-3.3-70b-instruct:free',
       'google/gemini-flash-1.5:free',
@@ -251,9 +457,7 @@ User request: ${prompt}`;
     }
 
     if (!generatedText) {
-      return res.status(503).json({ 
-        error: 'AI is busy right now. Please try again in a few seconds. (' + (lastError || 'unknown') + ')' 
-      });
+      return res.status(503).json({ error: 'AI is busy. Please try again. (' + (lastError || 'unknown') + ')' });
     }
 
     let cleaned = generatedText.trim();
