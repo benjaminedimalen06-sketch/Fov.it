@@ -24,70 +24,52 @@ const supabase = createClient(
 
 const JWT_SECRET = process.env.JWT_SECRET || 'fov-it-secret-change-me';
 
-// ===== HELPER =====
 function escapeHtml(text) {
   if (!text) return '';
   return text.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;').replace(/'/g, '&#039;');
 }
 
-// ===== FAVICON =====
 app.get('/favicon.ico', (req, res) => res.sendFile(path.join(__dirname, 'favicon.svg')));
 app.get('/favicon.svg', (req, res) => res.sendFile(path.join(__dirname, 'favicon.svg')));
 app.get('/og-image.svg', (req, res) => res.sendFile(path.join(__dirname, 'og-image.svg')));
 
-// ===== AI CHAT (OpenRouter — DYNAMIC MODEL LIST) =====
+// ===== AI CHAT =====
 app.post('/api/ai', async (req, res) => {
   const auth = req.headers.authorization;
   if (!auth || !auth.startsWith('Bearer ')) return res.status(401).json({ error: 'Not logged in' });
   try { jwt.verify(auth.slice(7), JWT_SECRET); } catch { return res.status(401).json({ error: 'Invalid token' }); }
 
   const OPENROUTER_API_KEY = process.env.OPENROUTER_API_KEY;
-  if (!OPENROUTER_API_KEY) return res.status(500).json({ error: 'OpenRouter API key not configured. Add OPENROUTER_API_KEY in Render.' });
+  if (!OPENROUTER_API_KEY) return res.status(500).json({ error: 'OpenRouter API key not configured' });
 
   try {
-    const { prompt, action = 'chat' } = req.body;
+    const { prompt } = req.body;
     if (!prompt || prompt.trim().length < 1) return res.status(400).json({ error: 'Message is required' });
 
-    const systemPrompt = `You are Fov.it AI — a helpful, friendly, and knowledgeable assistant.
+    const systemPrompt = `You are Fov.it AI — a helpful, friendly, and knowledgeable assistant. Be concise but helpful. Use markdown for code. User: ${prompt}`;
 
-RULES:
-- Be concise but helpful.
-- Use markdown formatting for code blocks (triple backticks).
-- If the user asks for code, provide clean, working code with comments.
-- If the user just wants to chat, be friendly and natural.
-- Never refuse to help with legitimate coding questions.
-
-User: ${prompt}`;
-
-    // ===== FETCH AVAILABLE FREE MODELS FROM OPENROUTER (LIVE) =====
+    // Dynamic free models mula sa OpenRouter
     let freeModels = [];
     try {
       const modelsRes = await fetch('https://openrouter.ai/api/v1/models');
       if (modelsRes.ok) {
         const modelsData = await modelsRes.json();
-        freeModels = (modelsData.data || [])
-          .filter(m => m.id && m.id.includes(':free'))
-          .map(m => m.id)
-          .slice(0, 10); // Top 10 free models
-        console.log(`✅ Found ${freeModels.length} free models:`, freeModels);
+        freeModels = (modelsData.data || []).filter(m => m.id && m.id.includes(':free')).map(m => m.id).slice(0, 10);
       }
-    } catch (e) {
-      console.error('Failed to fetch models:', e.message);
-    }
+    } catch (e) { console.error('Models fetch failed:', e.message); }
 
-    // Fallback kung walang makuha
     if (freeModels.length === 0) {
       freeModels = [
         'inclusionai/ling-3.0-flash-vl:free',
         'nex-agi/nex-n2.5-pro:free',
-        'nex-agi/nex-n2.5-mini:free'
+        'nex-agi/nex-n2.5-mini:free',
+        'inclusionai/ling-3.0-flash-fin:free'
       ];
     }
 
-    let lastError = null;
     let generatedText = null;
+    let lastError = null;
 
-    // Subukan lahat ng free models
     for (const model of freeModels) {
       try {
         console.log(`Trying: ${model}`);
@@ -113,30 +95,21 @@ User: ${prompt}`;
         if (response.ok) {
           const data = await response.json();
           generatedText = data.choices?.[0]?.message?.content || '';
-          if (generatedText) {
-            console.log(`✅ Success with: ${model}`);
-            break;
-          }
+          if (generatedText) { console.log(`✅ Success: ${model}`); break; }
         } else {
-          const errorText = await response.text();
-          console.error(`${model} failed:`, response.status);
           lastError = `${model}: ${response.status}`;
         }
       } catch (err) {
-        console.error(`${model} error:`, err.message);
         lastError = `${model}: ${err.message}`;
       }
     }
 
     if (!generatedText) {
-      return res.status(503).json({ 
-        error: 'AI is busy. Please try again in a moment. (' + (lastError || 'all models failed') + ')' 
-      });
+      return res.status(503).json({ error: 'AI is busy. Try again. (' + (lastError || 'failed') + ')' });
     }
 
-    return res.status(200).json({ success: true, result: generatedText, action });
+    return res.status(200).json({ success: true, result: generatedText });
   } catch (err) {
-    console.error('Server error:', err);
     return res.status(500).json({ error: 'Server error: ' + err.message });
   }
 });
@@ -267,56 +240,39 @@ app.get('/api/raw', async (req, res) => {
       <meta property="og:title" content="Fov.it — ${escapeHtml(script.title)}">
       <meta property="og:description" content="Protected Lua script.">
       <meta property="og:image" content="${protocol}://${host}/og-image.svg">
-      <meta name="twitter:card" content="summary_large_image">
       <style>
         * { margin: 0; padding: 0; box-sizing: border-box; }
-        body { font-family: 'Segoe UI', sans-serif; background: #0a0a0a; color: #fff; min-height: 100vh; display: flex; align-items: center; justify-content: center; padding: 20px; background-image: radial-gradient(circle at 20% 20%, rgba(0, 255, 136, 0.05) 0%, transparent 50%), radial-gradient(circle at 80% 80%, rgba(0, 255, 136, 0.05) 0%, transparent 50%); }
-        .container { background: #141414; padding: 48px 40px; border-radius: 16px; border: 1px solid #222; width: 100%; max-width: 720px; box-shadow: 0 0 80px rgba(0, 255, 136, 0.08); animation: fadeIn 0.5s ease; }
-        @keyframes fadeIn { from { opacity: 0; transform: translateY(20px); } to { opacity: 1; transform: translateY(0); } }
-        .header { text-align: center; margin-bottom: 32px; }
-        .logo { color: #00ff88; font-size: 32px; font-weight: bold; margin-bottom: 6px; text-shadow: 0 0 30px rgba(0, 255, 136, 0.5); }
-        .subtitle { color: #666; font-size: 12px; letter-spacing: 2px; text-transform: uppercase; }
-        .divider { height: 1px; background: linear-gradient(90deg, transparent, #222, transparent); margin: 24px 0; }
+        body { font-family: 'Segoe UI', sans-serif; background: #0a0a0a; color: #fff; min-height: 100vh; display: flex; align-items: center; justify-content: center; padding: 20px; }
+        .container { background: #141414; padding: 48px 40px; border-radius: 16px; border: 1px solid #222; width: 100%; max-width: 720px; }
+        .logo { color: #00ff88; font-size: 32px; font-weight: bold; text-align: center; margin-bottom: 6px; }
+        .subtitle { color: #666; font-size: 12px; text-align: center; letter-spacing: 2px; margin-bottom: 24px; }
         .title-section { margin-bottom: 24px; }
-        .title-section h1 { color: #fff; font-size: 22px; margin-bottom: 6px; display: flex; align-items: center; gap: 10px; }
-        .title-section .meta { color: #666; font-size: 12px; }
-        .badge { display: inline-block; background: #00ff88; color: #0a0a0a; padding: 4px 12px; border-radius: 20px; font-size: 10px; font-weight: bold; text-transform: uppercase; letter-spacing: 1px; }
-        .badge-protected { background: #ff4444; color: #fff; }
-        .code-section { margin-bottom: 20px; }
-        .code-label { color: #666; font-size: 11px; margin-bottom: 8px; text-transform: uppercase; letter-spacing: 1px; }
-        .code-box { background: #0a0a0a; border: 1px solid #00ff88; border-radius: 10px; padding: 18px; font-family: 'Consolas', 'Monaco', monospace; font-size: 12px; color: #00ff88; word-break: break-all; line-height: 1.6; position: relative; overflow: hidden; }
-        .code-box::before { content: ''; position: absolute; top: 0; left: 0; right: 0; height: 2px; background: linear-gradient(90deg, transparent, #00ff88, transparent); }
-        .copy-btn { width: 100%; padding: 16px; background: linear-gradient(135deg, #00ff88, #00cc6a); color: #0a0a0a; border: none; border-radius: 10px; font-size: 14px; font-weight: bold; cursor: pointer; margin-bottom: 12px; transition: all 0.3s ease; letter-spacing: 1px; }
-        .copy-btn:hover { transform: translateY(-2px); box-shadow: 0 8px 25px rgba(0, 255, 136, 0.4); }
-        .copy-btn.copied { background: linear-gradient(135deg, #0a2a0a, #0a2a0a); color: #00ff88; border: 1px solid #00ff88; }
-        .note { color: #666; font-size: 12px; text-align: center; margin-top: 16px; line-height: 1.6; }
-        .note strong { color: #00ff88; }
+        .title-section h1 { color: #fff; font-size: 22px; margin-bottom: 6px; }
+        .badge { display: inline-block; background: #ff4444; color: #fff; padding: 4px 12px; border-radius: 20px; font-size: 10px; font-weight: bold; }
+        .code-box { background: #0a0a0a; border: 1px solid #00ff88; border-radius: 10px; padding: 18px; font-family: 'Consolas', monospace; font-size: 12px; color: #00ff88; word-break: break-all; line-height: 1.6; }
+        .copy-btn { width: 100%; padding: 16px; background: linear-gradient(135deg, #00ff88, #00cc6a); color: #0a0a0a; border: none; border-radius: 10px; font-size: 14px; font-weight: bold; cursor: pointer; margin-top: 16px; }
         .footer { text-align: center; color: #444; font-size: 11px; margin-top: 24px; padding-top: 20px; border-top: 1px solid #1a1a1a; }
         .footer a { color: #00ff88; text-decoration: none; }
       </style>
     </head><body>
       <div class="container">
-        <div class="header"><div class="logo">Fov.it</div><div class="subtitle">Script Protection System</div></div>
-        <div class="divider"></div>
+        <div class="logo">Fov.it</div>
+        <div class="subtitle">Script Protection System</div>
         <div class="title-section">
           <h1>📋 ${escapeHtml(script.title)}</h1>
-          <div class="meta"><span class="badge badge-protected">🔒 Protected</span><span style="margin-left: 10px;">ID: ${id}</span></div>
+          <span class="badge">🔒 Protected</span>
         </div>
-        <div class="code-section">
-          <div class="code-label">Loadstring Command</div>
-          <div class="code-box" id="code">${escapeHtml(loadstringCmd)}</div>
-        </div>
-        <button class="copy-btn" id="copyBtn" onclick="copyCode()">📋 COPY LOADSTRING</button>
-        <div class="note">Paste this into your <strong>Roblox executor</strong> (Krnl, Fluxus, Synapse, etc.).</div>
-        <div class="footer">Protected by <a href="/">Fov.it</a> · ${new Date().getFullYear()}</div>
+        <div class="code-box" id="code">${escapeHtml(loadstringCmd)}</div>
+        <button class="copy-btn" onclick="copyCode()">📋 COPY LOADSTRING</button>
+        <div class="footer">Protected by <a href="/">Fov.it</a></div>
       </div>
       <script>
         function copyCode() {
           const code = document.getElementById('code').textContent;
-          const btn = document.getElementById('copyBtn');
-          const done = () => { btn.textContent = '✅ COPIED!'; btn.classList.add('copied'); setTimeout(() => { btn.textContent = '📋 COPY LOADSTRING'; btn.classList.remove('copied'); }, 2000); };
-          if (navigator.clipboard) { navigator.clipboard.writeText(code).then(done).catch(() => { const ta = document.createElement('textarea'); ta.value = code; document.body.appendChild(ta); ta.select(); document.execCommand('copy'); document.body.removeChild(ta); done(); }); }
-          else { const ta = document.createElement('textarea'); ta.value = code; document.body.appendChild(ta); ta.select(); document.execCommand('copy'); document.body.removeChild(ta); done(); }
+          navigator.clipboard.writeText(code).then(() => {
+            event.target.textContent = '✅ COPIED!';
+            setTimeout(() => event.target.textContent = '📋 COPY LOADSTRING', 2000);
+          });
         }
       </script>
     </body></html>
