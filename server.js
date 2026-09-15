@@ -35,7 +35,7 @@ app.get('/favicon.ico', (req, res) => res.sendFile(path.join(__dirname, 'favicon
 app.get('/favicon.svg', (req, res) => res.sendFile(path.join(__dirname, 'favicon.svg')));
 app.get('/og-image.svg', (req, res) => res.sendFile(path.join(__dirname, 'og-image.svg')));
 
-// ===== AI CHAT (Gemini muna, OpenRouter fallback) =====
+// ===== AI CHAT =====
 app.post('/api/ai', async (req, res) => {
   const auth = req.headers.authorization;
   if (!auth || !auth.startsWith('Bearer ')) return res.status(401).json({ error: 'Not logged in' });
@@ -45,7 +45,24 @@ app.post('/api/ai', async (req, res) => {
     const { prompt } = req.body;
     if (!prompt || prompt.trim().length < 1) return res.status(400).json({ error: 'Message is required' });
 
-    const systemPrompt = `You are Fov.it AI — a helpful assistant. Write COMPLETE code without truncation. Use markdown code blocks. User: ${prompt}`;
+    const systemPrompt = `You are an expert Roblox Lua developer.
+
+CRITICAL RULES:
+1. Start the code DIRECTLY with the first line of Lua code.
+2. NEVER add comment blocks like --[[ ... ]] at the beginning.
+3. NEVER add headers, titles, or descriptions inside the code.
+4. NEVER write "Place this in StarterPlayerScripts" or similar instructions inside the code.
+5. The very first line must be valid Lua code (like: local Players = game:GetService("Players")).
+6. Only use single-line comments (--) when necessary.
+
+CODE QUALITY:
+- Write COMPLETE, WORKING code. Never truncate.
+- Modern UI with UICorner, UIStroke, UIGradient.
+- Smooth animations using TweenService.
+- Proper cleanup of connections.
+- Handle character respawn.
+
+User request: ${prompt}`;
 
     // ===== TRY GEMINI FIRST =====
     if (GEMINI_API_KEY) {
@@ -68,9 +85,13 @@ app.post('/api/ai', async (req, res) => {
 
           if (response.ok) {
             const data = await response.json();
-            const text = data.candidates?.[0]?.content?.parts?.[0]?.text || '';
+            let text = data.candidates?.[0]?.content?.parts?.[0]?.text || '';
             if (text) {
-              console.log(`✅ Gemini success: ${model} (${text.length} chars)`);
+              // Remove leading comment blocks
+              text = text.replace(/^--\[\[[\s\S]*?\]\]\s*/g, '');
+              text = text.replace(/^--\s*[^\n]*\n\s*--\s*[^\n]*\n\s*--\s*[^\n]*\n/g, '');
+              text = text.trim();
+              console.log(`✅ Gemini success: ${model}`);
               return res.status(200).json({ success: true, result: text });
             }
           } else {
@@ -82,13 +103,12 @@ app.post('/api/ai', async (req, res) => {
       }
     }
 
-    // ===== FALLBACK TO OPENROUTER =====
+    // ===== FALLBACK OPENROUTER =====
     if (OPENROUTER_API_KEY) {
       const openrouterModels = [
         'inclusionai/ling-3.0-flash-vl:free',
         'nex-agi/nex-n2.5-pro:free',
-        'nex-agi/nex-n2.5-mini:free',
-        'inclusionai/ling-3.0-flash-fin:free'
+        'nex-agi/nex-n2.5-mini:free'
       ];
 
       for (const model of openrouterModels) {
@@ -115,8 +135,10 @@ app.post('/api/ai', async (req, res) => {
 
           if (response.ok) {
             const data = await response.json();
-            const text = data.choices?.[0]?.message?.content || '';
+            let text = data.choices?.[0]?.message?.content || '';
             if (text) {
+              text = text.replace(/^--\[\[[\s\S]*?\]\]\s*/g, '');
+              text = text.trim();
               console.log(`✅ OpenRouter success: ${model}`);
               return res.status(200).json({ success: true, result: text });
             }
@@ -129,7 +151,7 @@ app.post('/api/ai', async (req, res) => {
       }
     }
 
-    return res.status(503).json({ error: 'AI is busy. Please try again in a moment.' });
+    return res.status(503).json({ error: 'AI is busy. Please try again.' });
   } catch (err) {
     console.error('Server error:', err);
     return res.status(500).json({ error: 'Server error: ' + err.message });
