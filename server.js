@@ -35,7 +35,7 @@ app.get('/favicon.ico', (req, res) => res.sendFile(path.join(__dirname, 'favicon
 app.get('/favicon.svg', (req, res) => res.sendFile(path.join(__dirname, 'favicon.svg')));
 app.get('/og-image.svg', (req, res) => res.sendFile(path.join(__dirname, 'og-image.svg')));
 
-// ===== AI CHAT (OpenRouter) =====
+// ===== AI CHAT (OpenRouter — DYNAMIC MODEL LIST) =====
 app.post('/api/ai', async (req, res) => {
   const auth = req.headers.authorization;
   if (!auth || !auth.startsWith('Bearer ')) return res.status(401).json({ error: 'Not logged in' });
@@ -45,17 +45,10 @@ app.post('/api/ai', async (req, res) => {
   if (!OPENROUTER_API_KEY) return res.status(500).json({ error: 'OpenRouter API key not configured. Add OPENROUTER_API_KEY in Render.' });
 
   try {
-    const { prompt, language = 'javascript', action = 'generate' } = req.body;
+    const { prompt, action = 'chat' } = req.body;
     if (!prompt || prompt.trim().length < 1) return res.status(400).json({ error: 'Message is required' });
 
-    // ===== SYSTEM PROMPT =====
-    let systemPrompt = '';
-    if (action === 'chat' || action === 'generate') {
-      systemPrompt = `You are Fov.it AI — a helpful, friendly, and knowledgeable assistant. You can help with:
-- Coding (Lua, JavaScript, Python, etc.)
-- Roblox scripts and executors
-- General questions and conversations
-- Problem solving and ideas
+    const systemPrompt = `You are Fov.it AI — a helpful, friendly, and knowledgeable assistant.
 
 RULES:
 - Be concise but helpful.
@@ -65,38 +58,46 @@ RULES:
 - Never refuse to help with legitimate coding questions.
 
 User: ${prompt}`;
-    } else if (action === 'explain') {
-      systemPrompt = `Explain the following code in simple terms:\n\n${prompt}`;
-    } else if (action === 'fix') {
-      systemPrompt = `Fix all bugs in this code. Return only the corrected code:\n\n${prompt}`;
-    } else if (action === 'optimize') {
-      systemPrompt = `Optimize this code. Return only the optimized code:\n\n${prompt}`;
-    } else {
-      systemPrompt = `You are Fov.it AI, a helpful assistant. User: ${prompt}`;
+
+    // ===== FETCH AVAILABLE FREE MODELS FROM OPENROUTER (LIVE) =====
+    let freeModels = [];
+    try {
+      const modelsRes = await fetch('https://openrouter.ai/api/v1/models');
+      if (modelsRes.ok) {
+        const modelsData = await modelsRes.json();
+        freeModels = (modelsData.data || [])
+          .filter(m => m.id && m.id.includes(':free'))
+          .map(m => m.id)
+          .slice(0, 10); // Top 10 free models
+        console.log(`✅ Found ${freeModels.length} free models:`, freeModels);
+      }
+    } catch (e) {
+      console.error('Failed to fetch models:', e.message);
     }
 
-    // ===== FREE MODELS (available sa OpenRouter) =====
-    const MODELS = [
-      'inclusionai/ling-3.0-flash-vl:free',
-      'nex-agi/nex-n2.5-pro:free',
-      'nex-agi/nex-n2.5-mini:free',
-      'inclusionai/ling-3.0-flash-fin:free',
-      'inclusionai/ling-3.0-flash-sante:free'
-    ];
+    // Fallback kung walang makuha
+    if (freeModels.length === 0) {
+      freeModels = [
+        'inclusionai/ling-3.0-flash-vl:free',
+        'nex-agi/nex-n2.5-pro:free',
+        'nex-agi/nex-n2.5-mini:free'
+      ];
+    }
 
     let lastError = null;
     let generatedText = null;
 
-    for (const model of MODELS) {
+    // Subukan lahat ng free models
+    for (const model of freeModels) {
       try {
-        console.log(`Trying model: ${model}`);
+        console.log(`Trying: ${model}`);
         const response = await fetch('https://openrouter.ai/api/v1/chat/completions', {
           method: 'POST',
           headers: {
             'Content-Type': 'application/json',
             'Authorization': `Bearer ${OPENROUTER_API_KEY}`,
             'HTTP-Referer': 'https://fov-it.onrender.com',
-            'X-Title': 'Fov.it AI Chat'
+            'X-Title': 'Fov.it AI'
           },
           body: JSON.stringify({
             model: model,
@@ -113,22 +114,24 @@ User: ${prompt}`;
           const data = await response.json();
           generatedText = data.choices?.[0]?.message?.content || '';
           if (generatedText) {
-            console.log(`✅ Success with model: ${model}`);
+            console.log(`✅ Success with: ${model}`);
             break;
           }
         } else {
           const errorText = await response.text();
-          console.error(`Model ${model} failed:`, errorText);
+          console.error(`${model} failed:`, response.status);
           lastError = `${model}: ${response.status}`;
         }
       } catch (err) {
-        console.error(`Model ${model} error:`, err.message);
+        console.error(`${model} error:`, err.message);
         lastError = `${model}: ${err.message}`;
       }
     }
 
     if (!generatedText) {
-      return res.status(503).json({ error: 'AI is busy. Please try again. (' + (lastError || 'unknown') + ')' });
+      return res.status(503).json({ 
+        error: 'AI is busy. Please try again in a moment. (' + (lastError || 'all models failed') + ')' 
+      });
     }
 
     return res.status(200).json({ success: true, result: generatedText, action });
