@@ -24,28 +24,219 @@ const supabase = createClient(
 
 const JWT_SECRET = process.env.JWT_SECRET || 'fov-it-secret-change-me';
 
-// Fallback models — base sa available models ng iyong API key
-const GEMINI_MODELS = [
-  'gemini-2.5-flash',
-  'gemini-flash-latest',
-  'gemini-2.5-flash-lite',
-  'gemini-3.5-flash'
-];
+// ===== INSTANT TEMPLATES (walang AI wait) =====
+const TEMPLATES = {
+  fly: `-- Fly Script (press F to toggle)
+local Players = game:GetService("Players")
+local UserInputService = game:GetService("UserInputService")
+local RunService = game:GetService("RunService")
+local Workspace = game:GetService("Workspace")
 
-function escapeHtml(text) {
-  if (!text) return '';
-  return text
-    .replace(/&/g, '&amp;')
-    .replace(/</g, '&lt;')
-    .replace(/>/g, '&gt;')
-    .replace(/"/g, '&quot;')
-    .replace(/'/g, '&#039;');
-}
+local player = Players.LocalPlayer
+local character = player.Character or player.CharacterAdded:Wait()
+local hrp = character:WaitForChild("HumanoidRootPart")
+local camera = Workspace.CurrentCamera
 
-// ===== FAVICON =====
-app.get('/favicon.ico', (req, res) => res.sendFile(path.join(__dirname, 'favicon.svg')));
-app.get('/favicon.svg', (req, res) => res.sendFile(path.join(__dirname, 'favicon.svg')));
-app.get('/og-image.svg', (req, res) => res.sendFile(path.join(__dirname, 'og-image.svg')));
+local isFlying = false
+local flySpeed = 50
+local activeKeys = {}
+local bodyVelocity = nil
+
+local function getFlightDirection()
+    local direction = Vector3.zero
+    if activeKeys[Enum.KeyCode.W] then direction += camera.CFrame.LookVector end
+    if activeKeys[Enum.KeyCode.S] then direction -= camera.CFrame.LookVector end
+    if activeKeys[Enum.KeyCode.A] then direction -= camera.CFrame.RightVector end
+    if activeKeys[Enum.KeyCode.D] then direction += camera.CFrame.RightVector end
+    if activeKeys[Enum.KeyCode.Space] then direction += Vector3.new(0, 1, 0) end
+    if activeKeys[Enum.KeyCode.LeftShift] then direction -= Vector3.new(0, 1, 0) end
+    return direction.Magnitude > 0 and direction.Unit or Vector3.zero
+end
+
+local function toggleFly()
+    isFlying = not isFlying
+    if isFlying then
+        bodyVelocity = Instance.new("BodyVelocity")
+        bodyVelocity.MaxForce = Vector3.new(math.huge, math.huge, math.huge)
+        bodyVelocity.Velocity = Vector3.zero
+        bodyVelocity.Parent = hrp
+        
+        RunService.RenderStepped:Connect(function()
+            if not isFlying or not bodyVelocity or not bodyVelocity.Parent then return end
+            local moveDirection = getFlightDirection()
+            bodyVelocity.Velocity = moveDirection * flySpeed
+        end)
+    else
+        if bodyVelocity then
+            bodyVelocity:Destroy()
+            bodyVelocity = nil
+        end
+    end
+end
+
+UserInputService.InputBegan:Connect(function(input, processed)
+    if processed then return end
+    if input.KeyCode == Enum.KeyCode.F then
+        toggleFly()
+    elseif isFlying then
+        activeKeys[input.KeyCode] = true
+    end
+end)
+
+UserInputService.InputEnded:Connect(function(input)
+    activeKeys[input.KeyCode] = nil
+end)`,
+
+  speed: `-- Speed Script (press F to toggle)
+local Players = game:GetService("Players")
+local UserInputService = game:GetService("UserInputService")
+
+local player = Players.LocalPlayer
+local character = player.Character or player.CharacterAdded:Wait()
+local humanoid = character:WaitForChild("Humanoid")
+
+local normalSpeed = 16
+local fastSpeed = 100
+local isFast = false
+
+UserInputService.InputBegan:Connect(function(input, processed)
+    if processed then return end
+    if input.KeyCode == Enum.KeyCode.F then
+        isFast = not isFast
+        humanoid.WalkSpeed = isFast and fastSpeed or normalSpeed
+    end
+end)`,
+
+  jump: `-- Infinite Jump Script
+local Players = game:GetService("Players")
+local UserInputService = game:GetService("UserInputService")
+
+local player = Players.LocalPlayer
+local character = player.Character or player.CharacterAdded:Wait()
+local humanoid = character:WaitForChild("Humanoid")
+
+UserInputService.JumpRequest:Connect(function()
+    humanoid:ChangeState(Enum.HumanoidStateType.Jumping)
+end)`,
+
+  esp: `-- ESP Script
+local Players = game:GetService("Players")
+local RunService = game:GetService("RunService")
+local Workspace = game:GetService("Workspace")
+
+local player = Players.LocalPlayer
+local camera = Workspace.CurrentCamera
+
+local function createESP(targetPlayer)
+    local highlight = Instance.new("Highlight")
+    highlight.Name = "ESP_" .. targetPlayer.Name
+    highlight.FillColor = Color3.fromRGB(255, 0, 0)
+    highlight.OutlineColor = Color3.fromRGB(255, 255, 255)
+    highlight.FillTransparency = 0.5
+    highlight.OutlineTransparency = 0
+    highlight.Parent = targetPlayer.Character
+end
+
+for _, p in pairs(Players:GetPlayers()) do
+    if p ~= player and p.Character then
+        createESP(p)
+    end
+end
+
+Players.PlayerAdded:Connect(function(p)
+    p.CharacterAdded:Connect(function(char)
+        wait(1)
+        createESP(p)
+    end)
+end)`
+};
+
+// ===== AI GENERATOR =====
+app.post('/api/ai', async (req, res) => {
+  const auth = req.headers.authorization;
+  if (!auth || !auth.startsWith('Bearer ')) return res.status(401).json({ error: 'Not logged in' });
+  try { jwt.verify(auth.slice(7), JWT_SECRET); } catch { return res.status(401).json({ error: 'Invalid token' }); }
+
+  try {
+    const { prompt, language = 'lua', action = 'generate' } = req.body;
+    if (!prompt || prompt.trim().length < 3) return res.status(400).json({ error: 'Prompt is required' });
+
+    // ===== INSTANT TEMPLATES (para sa common requests) =====
+    if (action === 'generate') {
+      const p = prompt.toLowerCase();
+      
+      if (p.includes('fly') || p.includes('flight') || p.includes('flying')) {
+        return res.status(200).json({ success: true, result: TEMPLATES.fly, action, instant: true });
+      }
+      if (p.includes('speed') || p.includes('fast') || p.includes('walkspeed')) {
+        return res.status(200).json({ success: true, result: TEMPLATES.speed, action, instant: true });
+      }
+      if (p.includes('jump') || p.includes('infinite jump')) {
+        return res.status(200).json({ success: true, result: TEMPLATES.jump, action, instant: true });
+      }
+      if (p.includes('esp') || p.includes('highlight') || p.includes('see players')) {
+        return res.status(200).json({ success: true, result: TEMPLATES.esp, action, instant: true });
+      }
+    }
+
+    // ===== AI FALLBACK (kung walang template) =====
+    const GEMINI_API_KEY = process.env.GEMINI_API_KEY;
+    if (!GEMINI_API_KEY) return res.status(500).json({ error: 'Gemini API key not configured' });
+
+    const GEMINI_MODELS = ['gemini-2.5-flash', 'gemini-flash-latest', 'gemini-2.5-flash-lite', 'gemini-3.5-flash'];
+
+    let systemPrompt = '';
+    if (action === 'generate') {
+      systemPrompt = `You are an expert ${language} developer. Only respond with the code. No explanations, no markdown. Use modern syntax. For Lua/Roblox use game:GetService(). User request: ${prompt}`;
+    } else if (action === 'explain') {
+      systemPrompt = `Explain this ${language} code in simple terms:\n${prompt}`;
+    } else if (action === 'fix') {
+      systemPrompt = `Fix bugs in this ${language} code. Return only corrected code:\n${prompt}`;
+    } else if (action === 'optimize') {
+      systemPrompt = `Optimize this ${language} code. Return only optimized code:\n${prompt}`;
+    }
+
+    let lastError = null;
+    let generatedText = null;
+
+    for (const model of GEMINI_MODELS) {
+      try {
+        const response = await fetch(
+          `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${GEMINI_API_KEY}`,
+          {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              contents: [{ parts: [{ text: systemPrompt }] }],
+              generationConfig: { temperature: 0.7, maxOutputTokens: 4096 }
+            })
+          }
+        );
+
+        if (response.ok) {
+          const data = await response.json();
+          generatedText = data.candidates?.[0]?.content?.parts?.[0]?.text || '';
+          if (generatedText) break;
+        } else {
+          lastError = `${model}: ${response.status}`;
+        }
+      } catch (err) {
+        lastError = `${model}: ${err.message}`;
+      }
+    }
+
+    if (!generatedText) {
+      return res.status(503).json({ error: 'AI is busy. Try a simpler prompt like "fly script" or "speed script".' });
+    }
+
+    let cleaned = generatedText.trim();
+    cleaned = cleaned.replace(/^```[\w]*\s*\n?/gm, '').replace(/\n?```\s*$/gm, '').trim();
+
+    return res.status(200).json({ success: true, result: cleaned, action });
+  } catch (err) {
+    return res.status(500).json({ error: 'Server error: ' + err.message });
+  }
+});
 
 // ===== REGISTER =====
 app.post('/api/register', async (req, res) => {
@@ -336,96 +527,6 @@ app.get('/api/admin/scripts', async (req, res) => {
     }));
     return res.status(200).json({ scripts: scriptsWithOwner });
   } catch (err) {
-    return res.status(500).json({ error: 'Server error: ' + err.message });
-  }
-});
-
-// ===== AI GENERATOR (may retry + fallback) =====
-app.post('/api/ai', async (req, res) => {
-  const auth = req.headers.authorization;
-  if (!auth || !auth.startsWith('Bearer ')) return res.status(401).json({ error: 'Not logged in' });
-  try { jwt.verify(auth.slice(7), JWT_SECRET); } catch { return res.status(401).json({ error: 'Invalid token' }); }
-
-  const GEMINI_API_KEY = process.env.GEMINI_API_KEY;
-  if (!GEMINI_API_KEY) return res.status(500).json({ error: 'Gemini API key not configured' });
-
-  try {
-    const { prompt, language = 'javascript', action = 'generate' } = req.body;
-    if (!prompt || prompt.trim().length < 3) return res.status(400).json({ error: 'Prompt is required (min 3 characters)' });
-
-    let systemPrompt = '';
-    if (action === 'generate') {
-      systemPrompt = `You are an expert ${language} developer.
-
-RULES:
-1. Only respond with the code. No explanations, no markdown code blocks (no \`\`\`), no "Here is...".
-2. Make the code complete and runnable.
-3. Add short comments explaining key parts.
-4. Use modern syntax for ${language}.
-5. For Lua/Roblox: use game:GetService() and Roblox conventions.
-6. For JavaScript: use ES6+, async/await if needed.
-7. For Python: use Python 3.
-
-User request: ${prompt}`;
-    } else if (action === 'explain') {
-      systemPrompt = `You are an expert ${language} developer. Explain the following ${language} code in simple terms.`;
-    } else if (action === 'fix') {
-      systemPrompt = `You are an expert ${language} developer. Fix any bugs in the following ${language} code. Return only the corrected code, no explanations, no markdown.`;
-    } else if (action === 'optimize') {
-      systemPrompt = `You are an expert ${language} developer. Optimize the following ${language} code. Return only the optimized code, no explanations, no markdown.`;
-    }
-
-    const fullPrompt = action === 'generate' ? systemPrompt : `${systemPrompt}\n\nCode:\n${prompt}`;
-
-    let lastError = null;
-    let generatedText = null;
-
-    // Subukan ang bawat model hanggang may gumana
-    for (const model of GEMINI_MODELS) {
-      try {
-        console.log(`Trying model: ${model}`);
-        const response = await fetch(
-          `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${GEMINI_API_KEY}`,
-          {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({
-              contents: [{ parts: [{ text: fullPrompt }] }],
-              generationConfig: { temperature: 0.7, maxOutputTokens: 4096 }
-            })
-          }
-        );
-
-        if (response.ok) {
-          const data = await response.json();
-          generatedText = data.candidates?.[0]?.content?.parts?.[0]?.text || '';
-          if (generatedText) {
-            console.log(`✅ Success with model: ${model}`);
-            break;
-          }
-        } else {
-          const errorText = await response.text();
-          console.error(`Model ${model} failed:`, errorText);
-          lastError = `${model}: ${response.status}`;
-        }
-      } catch (err) {
-        console.error(`Model ${model} error:`, err.message);
-        lastError = `${model}: ${err.message}`;
-      }
-    }
-
-    if (!generatedText) {
-      return res.status(503).json({ 
-        error: 'All AI models are busy right now. Please try again in a few seconds. (' + (lastError || 'unknown') + ')' 
-      });
-    }
-
-    let cleaned = generatedText.trim();
-    cleaned = cleaned.replace(/^```[\w]*\s*\n?/gm, '').replace(/\n?```\s*$/gm, '').trim();
-
-    return res.status(200).json({ success: true, result: cleaned, action });
-  } catch (err) {
-    console.error('Server error:', err);
     return res.status(500).json({ error: 'Server error: ' + err.message });
   }
 });
