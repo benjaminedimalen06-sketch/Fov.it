@@ -23,6 +23,8 @@ const supabase = createClient(
 );
 
 const JWT_SECRET = process.env.JWT_SECRET || 'fov-it-secret-change-me';
+const GEMINI_API_KEY = process.env.GEMINI_API_KEY;
+const OPENROUTER_API_KEY = process.env.OPENROUTER_API_KEY;
 
 function escapeHtml(text) {
   if (!text) return '';
@@ -33,80 +35,103 @@ app.get('/favicon.ico', (req, res) => res.sendFile(path.join(__dirname, 'favicon
 app.get('/favicon.svg', (req, res) => res.sendFile(path.join(__dirname, 'favicon.svg')));
 app.get('/og-image.svg', (req, res) => res.sendFile(path.join(__dirname, 'og-image.svg')));
 
-// ===== AI CHAT (Gemini — available models only) =====
+// ===== AI CHAT (Gemini muna, OpenRouter fallback) =====
 app.post('/api/ai', async (req, res) => {
   const auth = req.headers.authorization;
   if (!auth || !auth.startsWith('Bearer ')) return res.status(401).json({ error: 'Not logged in' });
   try { jwt.verify(auth.slice(7), JWT_SECRET); } catch { return res.status(401).json({ error: 'Invalid token' }); }
 
-  const GEMINI_API_KEY = process.env.GEMINI_API_KEY;
-  if (!GEMINI_API_KEY) return res.status(500).json({ error: 'Gemini API key not configured' });
-
   try {
     const { prompt } = req.body;
     if (!prompt || prompt.trim().length < 1) return res.status(400).json({ error: 'Message is required' });
 
-    const systemPrompt = `You are Fov.it AI — a helpful assistant.
+    const systemPrompt = `You are Fov.it AI — a helpful assistant. Write COMPLETE code without truncation. Use markdown code blocks. User: ${prompt}`;
 
-CRITICAL RULES:
-- Write COMPLETE code without truncation. Never stop in the middle.
-- Use markdown code blocks with language name.
-- If code is very long, write it all.
-- Add comments.
+    // ===== TRY GEMINI FIRST =====
+    if (GEMINI_API_KEY) {
+      const geminiModels = ['gemini-2.5-flash', 'gemini-flash-latest', 'gemini-2.5-flash-lite'];
+      
+      for (const model of geminiModels) {
+        try {
+          console.log(`[Gemini] Trying: ${model}`);
+          const response = await fetch(
+            `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${GEMINI_API_KEY}`,
+            {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({
+                contents: [{ parts: [{ text: systemPrompt }] }],
+                generationConfig: { temperature: 0.7, maxOutputTokens: 65536 }
+              })
+            }
+          );
 
-User: ${prompt}`;
-
-    // Available models lang
-    const models = [
-      'gemini-2.5-flash',
-      'gemini-flash-latest',
-      'gemini-2.5-flash-lite',
-      'gemini-3.5-flash'
-    ];
-
-    let generatedText = null;
-    let lastError = null;
-
-    for (const model of models) {
-      try {
-        console.log(`Trying: ${model}`);
-        const response = await fetch(
-          `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${GEMINI_API_KEY}`,
-          {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({
-              contents: [{ parts: [{ text: systemPrompt }] }],
-              generationConfig: {
-                temperature: 0.7,
-                maxOutputTokens: 65536,
-                topP: 0.95,
-                topK: 40
-              }
-            })
+          if (response.ok) {
+            const data = await response.json();
+            const text = data.candidates?.[0]?.content?.parts?.[0]?.text || '';
+            if (text) {
+              console.log(`✅ Gemini success: ${model} (${text.length} chars)`);
+              return res.status(200).json({ success: true, result: text });
+            }
+          } else {
+            console.error(`❌ Gemini ${model}: ${response.status}`);
           }
-        );
-
-        if (response.ok) {
-          const data = await response.json();
-          generatedText = data.candidates?.[0]?.content?.parts?.[0]?.text || '';
-          if (generatedText) { console.log(`✅ Success: ${model} (${generatedText.length} chars)`); break; }
-        } else {
-          console.error(`❌ ${model}: ${response.status}`);
-          lastError = `${model}: ${response.status}`;
+        } catch (err) {
+          console.error(`❌ Gemini ${model}: ${err.message}`);
         }
-      } catch (err) {
-        console.error(`❌ ${model}: ${err.message}`);
-        lastError = `${model}: ${err.message}`;
       }
     }
 
-    if (!generatedText) {
-      return res.status(503).json({ error: 'AI is busy. Try again. (' + (lastError || 'failed') + ')' });
+    // ===== FALLBACK TO OPENROUTER =====
+    if (OPENROUTER_API_KEY) {
+      const openrouterModels = [
+        'inclusionai/ling-3.0-flash-vl:free',
+        'nex-agi/nex-n2.5-pro:free',
+        'nex-agi/nex-n2.5-mini:free',
+        'inclusionai/ling-3.0-flash-fin:free'
+      ];
+
+      for (const model of openrouterModels) {
+        try {
+          console.log(`[OpenRouter] Trying: ${model}`);
+          const response = await fetch('https://openrouter.ai/api/v1/chat/completions', {
+            method: 'POST',
+            headers: {
+              'Content-Type': 'application/json',
+              'Authorization': `Bearer ${OPENROUTER_API_KEY}`,
+              'HTTP-Referer': 'https://fov-it.onrender.com',
+              'X-Title': 'Fov.it AI'
+            },
+            body: JSON.stringify({
+              model: model,
+              messages: [
+                { role: 'system', content: systemPrompt },
+                { role: 'user', content: prompt }
+              ],
+              temperature: 0.7,
+              max_tokens: 16000
+            })
+          });
+
+          if (response.ok) {
+            const data = await response.json();
+            const text = data.choices?.[0]?.message?.content || '';
+            if (text) {
+              console.log(`✅ OpenRouter success: ${model}`);
+              return res.status(200).json({ success: true, result: text });
+            }
+          } else {
+            console.error(`❌ OpenRouter ${model}: ${response.status}`);
+          }
+        } catch (err) {
+          console.error(`❌ OpenRouter ${model}: ${err.message}`);
+        }
+      }
     }
 
-    return res.status(200).json({ success: true, result: generatedText });
+    return res.status(503).json({ error: 'AI is busy. Please try again in a moment.' });
   } catch (err) {
+    console.error('Server error:', err);
     return res.status(500).json({ error: 'Server error: ' + err.message });
   }
 });
