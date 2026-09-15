@@ -9,6 +9,8 @@
   <style>
     * { margin: 0; padding: 0; box-sizing: border-box; }
     body { font-family: 'Inter', sans-serif; background: #050505; color: #fff; height: 100vh; display: flex; overflow: hidden; }
+
+    /* ===== SIDEBAR ===== */
     .sidebar { width: 260px; background: #0a0a0a; border-right: 1px solid rgba(255, 255, 255, 0.05); display: flex; flex-direction: column; }
     .sidebar-header { padding: 16px; display: flex; align-items: center; justify-content: space-between; border-bottom: 1px solid rgba(255, 255, 255, 0.05); }
     .sidebar-logo { display: flex; align-items: center; gap: 8px; font-size: 16px; font-weight: 800; background: linear-gradient(135deg, #fff 0%, #00ff88 100%); -webkit-background-clip: text; -webkit-text-fill-color: transparent; background-clip: text; text-decoration: none; }
@@ -28,6 +30,8 @@
     .sidebar-footer { padding: 12px; border-top: 1px solid rgba(255, 255, 255, 0.05); }
     .back-link { display: flex; align-items: center; gap: 6px; color: #666; text-decoration: none; font-size: 12px; padding: 8px; border-radius: 6px; transition: all 0.2s; }
     .back-link:hover { background: rgba(255, 255, 255, 0.05); color: #fff; }
+
+    /* ===== MAIN ===== */
     .main { flex: 1; display: flex; flex-direction: column; background: #050505; position: relative; }
     .chat-header { padding: 16px 24px; border-bottom: 1px solid rgba(255, 255, 255, 0.05); display: flex; align-items: center; justify-content: space-between; background: rgba(10, 10, 10, 0.7); backdrop-filter: blur(20px); z-index: 10; }
     .chat-header-title { font-size: 14px; font-weight: 700; color: #fff; }
@@ -47,9 +51,7 @@
     .message.ai .message-avatar { background: linear-gradient(135deg, #00ff88, #00cc6a); color: #0a0a0a; }
     .message-content { background: #141414; border: 1px solid rgba(255, 255, 255, 0.05); border-radius: 12px; padding: 12px 16px; font-size: 14px; line-height: 1.6; color: #e0e0e0; max-width: calc(100% - 60px); word-wrap: break-word; overflow-wrap: break-word; }
     .message.user .message-content { background: linear-gradient(135deg, rgba(167, 139, 250, 0.15), rgba(124, 58, 237, 0.1)); border-color: rgba(167, 139, 250, 0.3); color: #fff; }
-    .message-content pre { background: #0a0a0a; border: 1px solid rgba(0, 255, 136, 0.2); border-radius: 8px; padding: 12px; margin: 8px 0; overflow-x: auto; font-family: 'Consolas', 'Monaco', monospace; font-size: 12px; color: #00ff88; white-space: pre-wrap; }
     .message-content code { background: #0a0a0a; padding: 2px 6px; border-radius: 4px; font-family: 'Consolas', 'Monaco', monospace; font-size: 12px; color: #00ff88; }
-    .message-content pre code { background: transparent; padding: 0; }
     .message-actions { display: flex; gap: 4px; margin-top: 8px; }
     .msg-action-btn { background: transparent; border: 1px solid rgba(255, 255, 255, 0.1); color: #888; padding: 4px 8px; border-radius: 6px; font-size: 10px; cursor: pointer; transition: all 0.2s; font-family: inherit; }
     .msg-action-btn:hover { background: rgba(255, 255, 255, 0.05); color: #fff; }
@@ -58,6 +60,16 @@
     .typing span:nth-child(2) { animation-delay: 0.2s; }
     .typing span:nth-child(3) { animation-delay: 0.4s; }
     @keyframes bounce { 0%, 60%, 100% { transform: translateY(0); opacity: 0.4; } 30% { transform: translateY(-8px); opacity: 1; } }
+
+    /* ===== CODE BLOCK WITH COPY BUTTON ===== */
+    .code-block { background: #0a0a0a; border: 1px solid rgba(0, 255, 136, 0.3); border-radius: 10px; margin: 12px 0; overflow: hidden; }
+    .code-header { background: rgba(0, 255, 136, 0.08); border-bottom: 1px solid rgba(0, 255, 136, 0.2); padding: 8px 12px; display: flex; justify-content: space-between; align-items: center; }
+    .code-lang { color: #00ff88; font-size: 11px; font-weight: 700; text-transform: uppercase; letter-spacing: 1px; font-family: 'Consolas', 'Monaco', monospace; }
+    .code-copy-btn { background: rgba(0, 255, 136, 0.1); border: 1px solid rgba(0, 255, 136, 0.3); color: #00ff88; padding: 4px 10px; border-radius: 6px; font-size: 11px; font-weight: 700; cursor: pointer; transition: all 0.2s; font-family: inherit; }
+    .code-copy-btn:hover { background: #00ff88; color: #0a0a0a; }
+    .code-block pre { background: #0a0a0a; border: none; border-radius: 0; padding: 14px; margin: 0; overflow-x: auto; font-family: 'Consolas', 'Monaco', monospace; font-size: 12px; color: #00ff88; white-space: pre-wrap; }
+
+    /* ===== INPUT ===== */
     .input-area { padding: 16px 24px 24px; background: #050505; border-top: 1px solid rgba(255, 255, 255, 0.05); }
     .input-wrapper { max-width: 800px; margin: 0 auto; background: #141414; border: 1px solid rgba(255, 255, 255, 0.1); border-radius: 16px; padding: 12px; display: flex; flex-direction: column; gap: 8px; transition: all 0.3s; }
     .input-wrapper:focus-within { border-color: rgba(0, 255, 136, 0.5); box-shadow: 0 0 0 3px rgba(0, 255, 136, 0.1); }
@@ -68,6 +80,7 @@
     .send-btn { background: linear-gradient(135deg, #00ff88, #00cc6a); color: #0a0a0a; border: none; width: 36px; height: 36px; border-radius: 10px; cursor: pointer; display: flex; align-items: center; justify-content: center; font-size: 18px; transition: all 0.3s; }
     .send-btn:hover { transform: scale(1.05); box-shadow: 0 0 20px rgba(0, 255, 136, 0.5); }
     .send-btn:disabled { background: #333; color: #666; cursor: not-allowed; transform: none; box-shadow: none; }
+
     @media (max-width: 768px) {
       .sidebar { width: 60px; }
       .sidebar .new-chat-btn span, .sidebar .chat-list, .sidebar .back-link span { display: none; }
@@ -165,9 +178,9 @@
       container.innerHTML = chat.messages.map((m, i) => `
         <div class="message ${m.role}">
           <div class="message-avatar">${m.role === 'user' ? 'Y' : 'AI'}</div>
-          <div>
+          <div style="max-width: calc(100% - 60px);">
             <div class="message-content">${formatMessage(m.content)}</div>
-            ${m.role === 'ai' ? `<div class="message-actions"><button class="msg-action-btn" onclick="copyMessage(${i})">📋 Copy</button></div>` : ''}
+            ${m.role === 'ai' ? `<div class="message-actions"><button class="msg-action-btn" onclick="copyMessage(${i})">📋 Copy Message</button></div>` : ''}
           </div>
         </div>
       `).join('');
@@ -176,11 +189,45 @@
     function formatMessage(text) {
       if (!text) return '';
       let html = escapeHtml(text);
-      html = html.replace(/```(\w*)\n?([\s\S]*?)```/g, '<pre><code>$2</code></pre>');
+      
+      // Code blocks with Copy button
+      html = html.replace(/```(\w*)\n?([\s\S]*?)```/g, function(match, lang, code) {
+        const langLabel = lang || 'code';
+        const codeId = 'code_' + Math.random().toString(36).substring(2, 9);
+        return `<div class="code-block">
+          <div class="code-header">
+            <span class="code-lang">${langLabel}</span>
+            <button class="code-copy-btn" onclick="copyCodeBlock('${codeId}', this)">📋 Copy</button>
+          </div>
+          <pre id="${codeId}"><code>${code}</code></pre>
+        </div>`;
+      });
+      
+      // Inline code
       html = html.replace(/`([^`]+)`/g, '<code>$1</code>');
+      // Bold
       html = html.replace(/\*\*([^*]+)\*\*/g, '<strong>$1</strong>');
+      // Line breaks (pero hindi sa loob ng code block)
       html = html.replace(/\n/g, '<br>');
       return html;
+    }
+    function copyCodeBlock(id, btn) {
+      const codeEl = document.getElementById(id);
+      if (!codeEl) return;
+      const text = codeEl.textContent;
+      navigator.clipboard.writeText(text).then(() => {
+        btn.textContent = '✅ Copied!';
+        setTimeout(() => btn.textContent = '📋 Copy', 2000);
+      }).catch(() => {
+        const ta = document.createElement('textarea');
+        ta.value = text;
+        document.body.appendChild(ta);
+        ta.select();
+        document.execCommand('copy');
+        document.body.removeChild(ta);
+        btn.textContent = '✅ Copied!';
+        setTimeout(() => btn.textContent = '📋 Copy', 2000);
+      });
     }
     function escapeHtml(text) {
       const div = document.createElement('div');
@@ -219,7 +266,7 @@
         const res = await fetch('/api/ai', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json', 'Authorization': 'Bearer ' + token },
-          body: JSON.stringify({ prompt: text, action: 'chat', language: 'javascript' })
+          body: JSON.stringify({ prompt: text })
         });
         const data = await res.json();
         const typing = document.getElementById('typingIndicator');
