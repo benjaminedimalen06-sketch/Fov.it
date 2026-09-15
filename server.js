@@ -24,7 +24,6 @@ const supabase = createClient(
 
 const JWT_SECRET = process.env.JWT_SECRET || 'fov-it-secret-change-me';
 const GEMINI_API_KEY = process.env.GEMINI_API_KEY;
-const OPENROUTER_API_KEY = process.env.OPENROUTER_API_KEY;
 
 function escapeHtml(text) {
   if (!text) return '';
@@ -35,123 +34,56 @@ app.get('/favicon.ico', (req, res) => res.sendFile(path.join(__dirname, 'favicon
 app.get('/favicon.svg', (req, res) => res.sendFile(path.join(__dirname, 'favicon.svg')));
 app.get('/og-image.svg', (req, res) => res.sendFile(path.join(__dirname, 'og-image.svg')));
 
-// ===== AI CHAT =====
+// ===== AI CHAT (INSTANT — flash-lite only) =====
 app.post('/api/ai', async (req, res) => {
   const auth = req.headers.authorization;
   if (!auth || !auth.startsWith('Bearer ')) return res.status(401).json({ error: 'Not logged in' });
   try { jwt.verify(auth.slice(7), JWT_SECRET); } catch { return res.status(401).json({ error: 'Invalid token' }); }
 
+  if (!GEMINI_API_KEY) return res.status(500).json({ error: 'Gemini API key not configured' });
+
   try {
     const { prompt } = req.body;
     if (!prompt || prompt.trim().length < 1) return res.status(400).json({ error: 'Message is required' });
 
-    const systemPrompt = `You are an expert Roblox Lua developer.
-
-CRITICAL RULES:
-1. Start the code DIRECTLY with the first line of Lua code.
-2. NEVER add comment blocks like --[[ ... ]] at the beginning.
-3. NEVER add headers, titles, or descriptions inside the code.
-4. NEVER write "Place this in StarterPlayerScripts" or similar instructions inside the code.
-5. The very first line must be valid Lua code (like: local Players = game:GetService("Players")).
-6. Only use single-line comments (--) when necessary.
-
-CODE QUALITY:
-- Write COMPLETE, WORKING code. Never truncate.
-- Modern UI with UICorner, UIStroke, UIGradient.
-- Smooth animations using TweenService.
-- Proper cleanup of connections.
-- Handle character respawn.
+    const systemPrompt = `You are an expert Roblox Lua developer. Start code DIRECTLY with first line of Lua code. NO comment blocks (--[[ ]]). NO headers or descriptions. NO instructions. First line must be valid Lua code.
 
 User request: ${prompt}`;
 
-    // ===== TRY GEMINI FIRST =====
-    if (GEMINI_API_KEY) {
-      const geminiModels = ['gemini-2.5-flash', 'gemini-flash-latest', 'gemini-2.5-flash-lite'];
-      
-      for (const model of geminiModels) {
-        try {
-          console.log(`[Gemini] Trying: ${model}`);
-          const response = await fetch(
-            `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${GEMINI_API_KEY}`,
-            {
-              method: 'POST',
-              headers: { 'Content-Type': 'application/json' },
-              body: JSON.stringify({
-                contents: [{ parts: [{ text: systemPrompt }] }],
-                generationConfig: { temperature: 0.7, maxOutputTokens: 65536 }
-              })
-            }
-          );
-
-          if (response.ok) {
-            const data = await response.json();
-            let text = data.candidates?.[0]?.content?.parts?.[0]?.text || '';
-            if (text) {
-              // Remove leading comment blocks
-              text = text.replace(/^--\[\[[\s\S]*?\]\]\s*/g, '');
-              text = text.replace(/^--\s*[^\n]*\n\s*--\s*[^\n]*\n\s*--\s*[^\n]*\n/g, '');
-              text = text.trim();
-              console.log(`✅ Gemini success: ${model}`);
-              return res.status(200).json({ success: true, result: text });
-            }
-          } else {
-            console.error(`❌ Gemini ${model}: ${response.status}`);
+    // ISANG MODELO LANG — pinaka-mabilis
+    console.log(`[Gemini] Trying: gemini-2.5-flash-lite`);
+    const response = await fetch(
+      `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash-lite:generateContent?key=${GEMINI_API_KEY}`,
+      {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          contents: [{ parts: [{ text: systemPrompt }] }],
+          generationConfig: { 
+            temperature: 0.7, 
+            maxOutputTokens: 8192
           }
-        } catch (err) {
-          console.error(`❌ Gemini ${model}: ${err.message}`);
-        }
+        })
       }
+    );
+
+    if (!response.ok) {
+      console.error(`❌ Gemini: ${response.status}`);
+      return res.status(500).json({ error: 'AI request failed: ' + response.status });
     }
 
-    // ===== FALLBACK OPENROUTER =====
-    if (OPENROUTER_API_KEY) {
-      const openrouterModels = [
-        'inclusionai/ling-3.0-flash-vl:free',
-        'nex-agi/nex-n2.5-pro:free',
-        'nex-agi/nex-n2.5-mini:free'
-      ];
+    const data = await response.json();
+    let text = data.candidates?.[0]?.content?.parts?.[0]?.text || '';
+    
+    if (!text) return res.status(500).json({ error: 'AI returned empty response' });
 
-      for (const model of openrouterModels) {
-        try {
-          console.log(`[OpenRouter] Trying: ${model}`);
-          const response = await fetch('https://openrouter.ai/api/v1/chat/completions', {
-            method: 'POST',
-            headers: {
-              'Content-Type': 'application/json',
-              'Authorization': `Bearer ${OPENROUTER_API_KEY}`,
-              'HTTP-Referer': 'https://fov-it.onrender.com',
-              'X-Title': 'Fov.it AI'
-            },
-            body: JSON.stringify({
-              model: model,
-              messages: [
-                { role: 'system', content: systemPrompt },
-                { role: 'user', content: prompt }
-              ],
-              temperature: 0.7,
-              max_tokens: 16000
-            })
-          });
+    // Tanggalin ang comment block sa simula
+    text = text.replace(/^--\[\[[\s\S]*?\]\]\s*/g, '');
+    text = text.replace(/^--[^\n]*\n/g, '');
+    text = text.trim();
 
-          if (response.ok) {
-            const data = await response.json();
-            let text = data.choices?.[0]?.message?.content || '';
-            if (text) {
-              text = text.replace(/^--\[\[[\s\S]*?\]\]\s*/g, '');
-              text = text.trim();
-              console.log(`✅ OpenRouter success: ${model}`);
-              return res.status(200).json({ success: true, result: text });
-            }
-          } else {
-            console.error(`❌ OpenRouter ${model}: ${response.status}`);
-          }
-        } catch (err) {
-          console.error(`❌ OpenRouter ${model}: ${err.message}`);
-        }
-      }
-    }
-
-    return res.status(503).json({ error: 'AI is busy. Please try again.' });
+    console.log(`✅ Success (${text.length} chars)`);
+    return res.status(200).json({ success: true, result: text });
   } catch (err) {
     console.error('Server error:', err);
     return res.status(500).json({ error: 'Server error: ' + err.message });
