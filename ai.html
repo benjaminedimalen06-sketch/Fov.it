@@ -1,0 +1,425 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Fov.it — AI Generator</title>
+  <link rel="icon" type="image/svg+xml" href="/favicon.svg">
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800;900&display=swap" rel="stylesheet">
+  <style>
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+    body {
+      font-family: 'Inter', sans-serif;
+      background: #050505;
+      color: #fff;
+      min-height: 100vh;
+      position: relative;
+      overflow-x: hidden;
+    }
+    body::before {
+      content: '';
+      position: fixed;
+      top: 0; left: 0; right: 0; bottom: 0;
+      background:
+        radial-gradient(circle at 20% 20%, rgba(0, 255, 136, 0.08) 0%, transparent 40%),
+        radial-gradient(circle at 80% 80%, rgba(167, 139, 250, 0.05) 0%, transparent 40%);
+      pointer-events: none;
+      z-index: 0;
+    }
+    .navbar {
+      background: rgba(10, 10, 10, 0.7);
+      backdrop-filter: blur(30px);
+      border-bottom: 1px solid rgba(255, 255, 255, 0.05);
+      padding: 16px 32px;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      position: sticky;
+      top: 0;
+      z-index: 100;
+    }
+    .logo {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      font-size: 22px;
+      font-weight: 900;
+      letter-spacing: -0.5px;
+      background: linear-gradient(135deg, #fff 0%, #00ff88 100%);
+      -webkit-background-clip: text;
+      -webkit-text-fill-color: transparent;
+      background-clip: text;
+      text-decoration: none;
+    }
+    .logo-icon {
+      width: 32px; height: 32px;
+      background: linear-gradient(135deg, #00ff88, #00cc6a);
+      border-radius: 10px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 18px;
+      font-weight: 900;
+      color: #0a0a0a;
+      box-shadow: 0 0 30px rgba(0, 255, 136, 0.5);
+    }
+    .back-btn {
+      background: rgba(255, 255, 255, 0.05);
+      color: #fff;
+      border: 1px solid rgba(255, 255, 255, 0.1);
+      padding: 10px 20px;
+      border-radius: 10px;
+      cursor: pointer;
+      font-size: 13px;
+      font-weight: 700;
+      text-decoration: none;
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      transition: all 0.3s;
+      font-family: inherit;
+    }
+    .back-btn:hover { background: rgba(255, 255, 255, 0.1); transform: translateX(-3px); }
+    .container { max-width: 1100px; margin: 0 auto; padding: 48px 32px; position: relative; z-index: 1; }
+    .page-title {
+      text-align: center;
+      margin-bottom: 40px;
+      animation: fadeUp 0.6s ease;
+    }
+    @keyframes fadeUp {
+      from { opacity: 0; transform: translateY(30px); }
+      to { opacity: 1; transform: translateY(0); }
+    }
+    .page-title h1 {
+      font-size: 42px;
+      font-weight: 900;
+      letter-spacing: -1.5px;
+      margin-bottom: 12px;
+      background: linear-gradient(135deg, #fff 0%, #a78bfa 50%, #00ff88 100%);
+      background-size: 200% auto;
+      -webkit-background-clip: text;
+      -webkit-text-fill-color: transparent;
+      background-clip: text;
+      animation: shine 4s linear infinite;
+    }
+    @keyframes shine { to { background-position: 200% center; } }
+    .page-title p { color: #666; font-size: 15px; }
+    .tabs {
+      display: flex;
+      gap: 8px;
+      justify-content: center;
+      margin-bottom: 32px;
+      flex-wrap: wrap;
+    }
+    .tab {
+      background: rgba(255, 255, 255, 0.05);
+      color: #aaa;
+      border: 1px solid rgba(255, 255, 255, 0.1);
+      padding: 10px 20px;
+      border-radius: 10px;
+      cursor: pointer;
+      font-size: 13px;
+      font-weight: 700;
+      transition: all 0.3s;
+      font-family: inherit;
+    }
+    .tab:hover { background: rgba(255, 255, 255, 0.1); color: #fff; }
+    .tab.active {
+      background: linear-gradient(135deg, #00ff88, #00cc6a);
+      color: #0a0a0a;
+      border-color: transparent;
+      box-shadow: 0 0 30px rgba(0, 255, 136, 0.4);
+    }
+    .form-card {
+      background: linear-gradient(135deg, rgba(20, 20, 20, 0.9), rgba(15, 15, 15, 0.9));
+      backdrop-filter: blur(20px);
+      border: 1px solid rgba(255, 255, 255, 0.05);
+      border-radius: 24px;
+      padding: 40px;
+      animation: fadeUp 0.6s ease 0.1s both;
+      box-shadow: 0 20px 60px rgba(0, 0, 0, 0.5);
+    }
+    .form-group { margin-bottom: 24px; }
+    label {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      margin-bottom: 10px;
+      color: #aaa;
+      font-size: 13px;
+      font-weight: 600;
+      text-transform: uppercase;
+      letter-spacing: 1px;
+    }
+    select, textarea {
+      width: 100%;
+      padding: 16px 20px;
+      background: rgba(0, 0, 0, 0.5);
+      border: 1px solid rgba(255, 255, 255, 0.1);
+      border-radius: 12px;
+      color: #fff;
+      font-size: 14px;
+      outline: none;
+      font-family: inherit;
+      transition: all 0.3s;
+    }
+    select:focus, textarea:focus {
+      border-color: #00ff88;
+      box-shadow: 0 0 0 3px rgba(0, 255, 136, 0.1);
+      background: rgba(0, 0, 0, 0.7);
+    }
+    select option { background: #141414; }
+    textarea {
+      min-height: 200px;
+      font-family: 'Consolas', 'Monaco', monospace;
+      font-size: 13px;
+      line-height: 1.7;
+      resize: vertical;
+    }
+    textarea::placeholder { color: #444; }
+    .btn {
+      padding: 16px 32px;
+      border: none;
+      border-radius: 12px;
+      font-size: 14px;
+      font-weight: 800;
+      cursor: pointer;
+      transition: all 0.3s;
+      font-family: inherit;
+      display: inline-flex;
+      align-items: center;
+      gap: 8px;
+      letter-spacing: 0.5px;
+    }
+    .btn-primary {
+      background: linear-gradient(135deg, #00ff88, #00cc6a);
+      color: #0a0a0a;
+      width: 100%;
+      justify-content: center;
+      box-shadow: 0 10px 40px rgba(0, 255, 136, 0.3);
+    }
+    .btn-primary:hover { transform: translateY(-3px); box-shadow: 0 20px 60px rgba(0, 255, 136, 0.5); }
+    .btn-primary:disabled { background: #444; color: #888; cursor: not-allowed; transform: none; box-shadow: none; }
+    .btn-copy {
+      background: rgba(255, 255, 255, 0.05);
+      color: #fff;
+      border: 1px solid rgba(255, 255, 255, 0.1);
+    }
+    .btn-copy:hover { background: rgba(255, 255, 255, 0.1); transform: translateY(-3px); }
+    .output-box {
+      background: rgba(0, 0, 0, 0.5);
+      border: 1px solid rgba(0, 255, 136, 0.3);
+      border-radius: 12px;
+      padding: 20px;
+      margin-top: 24px;
+      min-height: 200px;
+      font-family: 'Consolas', 'Monaco', monospace;
+      font-size: 13px;
+      line-height: 1.7;
+      color: #00ff88;
+      white-space: pre-wrap;
+      word-break: break-word;
+      overflow-x: auto;
+      display: none;
+    }
+    .output-box.show { display: block; animation: fadeUp 0.5s ease; }
+    .output-label {
+      color: #666;
+      font-size: 11px;
+      margin-bottom: 10px;
+      text-transform: uppercase;
+      letter-spacing: 1px;
+    }
+    .error {
+      background: linear-gradient(135deg, rgba(255, 68, 68, 0.15), rgba(255, 68, 68, 0.05));
+      border: 1px solid rgba(255, 68, 68, 0.3);
+      color: #ff8888;
+      padding: 14px 20px;
+      border-radius: 12px;
+      margin-bottom: 20px;
+      font-size: 13px;
+      font-weight: 600;
+      display: none;
+    }
+    .error.show { display: block; }
+    .toast {
+      position: fixed;
+      bottom: 32px;
+      right: 32px;
+      background: linear-gradient(135deg, #00ff88, #00cc6a);
+      color: #0a0a0a;
+      padding: 16px 28px;
+      border-radius: 14px;
+      font-weight: 800;
+      font-size: 14px;
+      display: none;
+      z-index: 999;
+      box-shadow: 0 20px 60px rgba(0, 255, 136, 0.5);
+    }
+    .loading {
+      display: none;
+      text-align: center;
+      padding: 40px;
+      color: #00ff88;
+    }
+    .loading.show { display: block; }
+    .spinner {
+      width: 40px;
+      height: 40px;
+      border: 3px solid rgba(0, 255, 136, 0.2);
+      border-top-color: #00ff88;
+      border-radius: 50%;
+      animation: spin 1s linear infinite;
+      margin: 0 auto 16px;
+    }
+    @keyframes spin { to { transform: rotate(360deg); } }
+    @media (max-width: 768px) {
+      .container { padding: 32px 20px; }
+      .form-card { padding: 24px; }
+      .page-title h1 { font-size: 28px; }
+      .navbar { padding: 14px 20px; }
+    }
+  </style>
+</head>
+<body>
+  <div class="navbar">
+    <a href="/dashboard.html" class="logo">
+      <div class="logo-icon">F</div>
+      Fov.it
+    </a>
+    <a href="/dashboard.html" class="back-btn">← Back to Dashboard</a>
+  </div>
+  <div class="container">
+    <div class="page-title">
+      <h1>🤖 AI Script Generator</h1>
+      <p>Powered by Google Gemini</p>
+    </div>
+    <div class="tabs">
+      <button class="tab active" onclick="switchTab('generate', this)">✨ Generate</button>
+      <button class="tab" onclick="switchTab('explain', this)">📖 Explain</button>
+      <button class="tab" onclick="switchTab('fix', this)">🔧 Fix</button>
+      <button class="tab" onclick="switchTab('optimize', this)">⚡ Optimize</button>
+    </div>
+    <div class="form-card">
+      <div class="error" id="error"></div>
+      <div class="form-group">
+        <label>🌐 Language</label>
+        <select id="language">
+          <option value="javascript">JavaScript</option>
+          <option value="lua">Lua (Roblox)</option>
+          <option value="python">Python</option>
+          <option value="html">HTML/CSS</option>
+          <option value="typescript">TypeScript</option>
+        </select>
+      </div>
+      <div class="form-group">
+        <label id="promptLabel">💬 Prompt (Describe what you want)</label>
+        <textarea id="prompt" placeholder="Example: Create a function that adds two numbers..."></textarea>
+      </div>
+      <button class="btn btn-primary" id="generateBtn" onclick="generate()">
+        <span id="btnText">🚀 Generate Script</span>
+      </button>
+      <div class="loading" id="loading">
+        <div class="spinner"></div>
+        <div>AI is thinking...</div>
+      </div>
+      <div id="outputSection" style="display:none;">
+        <div class="output-label">📄 Result</div>
+        <div class="output-box show" id="output"></div>
+        <div style="display:flex; gap:12px; margin-top:16px; flex-wrap:wrap;">
+          <button class="btn btn-copy" onclick="copyOutput()">📋 Copy</button>
+          <button class="btn btn-copy" onclick="saveToEditor()">💾 Save to Editor</button>
+        </div>
+      </div>
+    </div>
+  </div>
+  <div class="toast" id="toast">Copied!</div>
+  <script>
+    const token = localStorage.getItem('fov_token');
+    if (!token) window.location.href = '/';
+    let currentAction = 'generate';
+    function switchTab(action, el) {
+      currentAction = action;
+      document.querySelectorAll('.tab').forEach(t => t.classList.remove('active'));
+      el.classList.add('active');
+      const labels = {
+        generate: '💬 Prompt (Describe what you want)',
+        explain: '📖 Code (Paste code to explain)',
+        fix: '🔧 Code (Paste code with errors)',
+        optimize: '⚡ Code (Paste code to optimize)'
+      };
+      const placeholders = {
+        generate: 'Example: Create a function that adds two numbers...',
+        explain: 'Paste your code here...',
+        fix: 'Paste your broken code here...',
+        optimize: 'Paste your code here...'
+      };
+      const btnTexts = {
+        generate: '🚀 Generate Script',
+        explain: '📖 Explain Code',
+        fix: '🔧 Fix Code',
+        optimize: '⚡ Optimize Code'
+      };
+      document.getElementById('promptLabel').textContent = labels[action];
+      document.getElementById('prompt').placeholder = placeholders[action];
+      document.getElementById('btnText').textContent = btnTexts[action];
+      document.getElementById('outputSection').style.display = 'none';
+      document.getElementById('error').classList.remove('show');
+    }
+    async function generate() {
+      const prompt = document.getElementById('prompt').value.trim();
+      const language = document.getElementById('language').value;
+      const btn = document.getElementById('generateBtn');
+      const errorBox = document.getElementById('error');
+      const loading = document.getElementById('loading');
+      const outputSection = document.getElementById('outputSection');
+      if (!prompt) {
+        errorBox.textContent = '❌ Please enter a prompt or code';
+        errorBox.classList.add('show');
+        return;
+      }
+      btn.disabled = true;
+      errorBox.classList.remove('show');
+      outputSection.style.display = 'none';
+      loading.classList.add('show');
+      try {
+        const res = await fetch('/api/ai', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'Authorization': 'Bearer ' + token
+          },
+          body: JSON.stringify({ prompt, language, action: currentAction })
+        });
+        const data = await res.json();
+        if (!res.ok) throw new Error(data.error || 'AI request failed');
+        document.getElementById('output').textContent = data.result;
+        outputSection.style.display = 'block';
+      } catch (err) {
+        errorBox.textContent = '❌ ' + err.message;
+        errorBox.classList.add('show');
+      } finally {
+        btn.disabled = false;
+        loading.classList.remove('show');
+      }
+    }
+    function copyOutput() {
+      const text = document.getElementById('output').textContent;
+      navigator.clipboard.writeText(text).then(() => {
+        showToast('✅ Copied!');
+      });
+    }
+    function saveToEditor() {
+      const text = document.getElementById('output').textContent;
+      localStorage.setItem('fov_ai_output', text);
+      window.location.href = '/editor.html?from=ai';
+    }
+    function showToast(msg) {
+      const t = document.getElementById('toast');
+      t.textContent = msg;
+      t.style.display = 'block';
+      setTimeout(() => t.style.display = 'none', 2500);
+    }
+  </script>
+</body>
+</html>
