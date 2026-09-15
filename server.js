@@ -145,7 +145,7 @@ app.post('/api/upload', async (req, res) => {
   }
 });
 
-// ===== LIST (user sees own scripts, owner sees all) =====
+// ===== LIST =====
 app.get('/api/list', async (req, res) => {
   const auth = req.headers.authorization;
   if (!auth || !auth.startsWith('Bearer ')) return res.status(401).json({ error: 'Not logged in' });
@@ -506,7 +506,7 @@ app.get('/api/admin/scripts', async (req, res) => {
   }
 });
 
-// ===== AI GENERATOR (Gemini 2.0 Flash) =====
+// ===== AI GENERATOR (Gemini 2.5 Flash) =====
 app.post('/api/ai', async (req, res) => {
   const auth = req.headers.authorization;
   if (!auth || !auth.startsWith('Bearer ')) return res.status(401).json({ error: 'Not logged in' });
@@ -542,7 +542,7 @@ app.post('/api/ai', async (req, res) => {
       : `${systemPrompt}\n\nCode:\n${prompt}`;
 
     const response = await fetch(
-      `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key=${GEMINI_API_KEY}`,
+      `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=${GEMINI_API_KEY}`,
       {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
