@@ -34,7 +34,7 @@ app.get('/favicon.ico', (req, res) => res.sendFile(path.join(__dirname, 'favicon
 app.get('/favicon.svg', (req, res) => res.sendFile(path.join(__dirname, 'favicon.svg')));
 app.get('/og-image.svg', (req, res) => res.sendFile(path.join(__dirname, 'og-image.svg')));
 
-// ===== AI CHAT (INSTANT — flash-lite only) =====
+// ===== AI CHAT (gemini-2.5-flash) =====
 app.post('/api/ai', async (req, res) => {
   const auth = req.headers.authorization;
   if (!auth || !auth.startsWith('Bearer ')) return res.status(401).json({ error: 'Not logged in' });
@@ -50,10 +50,9 @@ app.post('/api/ai', async (req, res) => {
 
 User request: ${prompt}`;
 
-    // ISANG MODELO LANG — pinaka-mabilis
-    console.log(`[Gemini] Trying: gemini-2.5-flash-lite`);
+    console.log(`[Gemini] Trying: gemini-2.5-flash`);
     const response = await fetch(
-      `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash-lite:generateContent?key=${GEMINI_API_KEY}`,
+      `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=${GEMINI_API_KEY}`,
       {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -68,7 +67,8 @@ User request: ${prompt}`;
     );
 
     if (!response.ok) {
-      console.error(`❌ Gemini: ${response.status}`);
+      const errorText = await response.text();
+      console.error(`❌ Gemini: ${response.status}`, errorText);
       return res.status(500).json({ error: 'AI request failed: ' + response.status });
     }
 
