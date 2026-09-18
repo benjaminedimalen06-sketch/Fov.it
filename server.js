@@ -116,7 +116,7 @@ app.post('/api/upload', async (req, res) => {
   }
 });
 
-// ===== LIST =====
+// ===== LIST (own scripts only - even for owner) =====
 app.get('/api/list', async (req, res) => {
   const auth = req.headers.authorization;
   if (!auth || !auth.startsWith('Bearer ')) return res.status(401).json({ error: 'Not logged in' });
@@ -124,13 +124,12 @@ app.get('/api/list', async (req, res) => {
   try { user = jwt.verify(auth.slice(7), JWT_SECRET); } catch { return res.status(401).json({ error: 'Invalid token' }); }
 
   try {
-    const isOwner = user.role === 'owner';
-    let query = supabase.from('scripts')
+    // Lahat ng users (kasama ang owner) ay makikita lang ang SARILING scripts sa dashboard
+    const { data, error } = await supabase.from('scripts')
       .select('id, title, public_link, user_id, access_type, created_at, updated_at')
+      .eq('user_id', user.id)
       .order('created_at', { ascending: false });
-    if (!isOwner) query = query.eq('user_id', user.id);
 
-    const { data, error } = await query;
     if (error) return res.status(500).json({ error: 'Failed to fetch: ' + error.message });
     return res.status(200).json({ scripts: data || [] });
   } catch (err) {
@@ -531,7 +530,7 @@ app.get('/api/admin/users', async (req, res) => {
   }
 });
 
-// ===== ADMIN: ALL SCRIPTS =====
+// ===== ADMIN: ALL SCRIPTS (metadata only - no content) =====
 app.get('/api/admin/scripts', async (req, res) => {
   const auth = req.headers.authorization;
   if (!auth || !auth.startsWith('Bearer ')) return res.status(401).json({ error: 'Not logged in' });
