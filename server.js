@@ -34,14 +34,14 @@ app.get('/favicon.ico', (req, res) => res.sendFile(path.join(__dirname, 'favicon
 app.get('/favicon.svg', (req, res) => res.sendFile(path.join(__dirname, 'favicon.svg')));
 app.get('/og-image.svg', (req, res) => res.sendFile(path.join(__dirname, 'og-image.svg')));
 
-// ===== AI CHAT (OpenRouter — dynamic free models) =====
+// ===== AI CHAT (OpenRouter - Dynamic Free Models) =====
 app.post('/api/ai', async (req, res) => {
   const auth = req.headers.authorization;
   if (!auth || !auth.startsWith('Bearer ')) return res.status(401).json({ error: 'Not logged in' });
   try { jwt.verify(auth.slice(7), JWT_SECRET); } catch { return res.status(401).json({ error: 'Invalid token' }); }
 
   const OPENROUTER_API_KEY = process.env.OPENROUTER_API_KEY;
-  if (!OPENROUTER_API_KEY) return res.status(500).json({ error: 'OpenRouter API key not configured' });
+  if (!OPENROUTER_API_KEY) return res.status(500).json({ error: 'OpenRouter API key not configured. Add OPENROUTER_API_KEY in Render Environment Variables.' });
 
   try {
     const { prompt, image } = req.body;
@@ -61,6 +61,7 @@ CRITICAL RULES:
 3. NEVER add headers, titles, or descriptions inside the code.
 4. The very first line must be valid Lua code (like: local Players = game:GetService("Players")).
 5. Only use single-line comments (--) when necessary.
+6. Make sure all brackets, parentheses, and ends are properly closed.
 
 DESIGN PRINCIPLES:
 - Modern glassmorphism style (transparency, blur effects)
@@ -89,7 +90,7 @@ User request: ${prompt || '(Analyze the image)'}`;
       messages.push({ role: 'user', content: prompt });
     }
 
-    // Get available free models
+    // Get available free models from OpenRouter
     let freeModels = [];
     try {
       const modelsRes = await fetch('https://openrouter.ai/api/v1/models');
@@ -102,11 +103,13 @@ User request: ${prompt || '(Analyze the image)'}`;
       }
     } catch (e) { console.error('Models fetch failed:', e.message); }
 
+    // Fallback models
     if (freeModels.length === 0) {
       freeModels = [
-        'inclusionai/ling-3.0-flash-vl:free',
-        'nex-agi/nex-n2.5-pro:free',
-        'nex-agi/nex-n2.5-mini:free'
+        'google/gemini-2.0-flash-exp:free',
+        'meta-llama/llama-3.3-70b-instruct:free',
+        'qwen/qwen-2.5-72b-instruct:free',
+        'mistralai/mistral-small-3.1-24b-instruct:free'
       ];
     }
 
@@ -154,7 +157,7 @@ User request: ${prompt || '(Analyze the image)'}`;
     }
 
     if (!generatedText) {
-      return res.status(503).json({ error: 'AI busy. Try again. (' + (lastError || 'failed') + ')' });
+      return res.status(503).json({ error: 'AI is busy. Please try again. (' + (lastError || 'all models failed') + ')' });
     }
 
     return res.status(200).json({ success: true, result: generatedText });
@@ -219,7 +222,7 @@ app.post('/api/login', async (req, res) => {
   }
 });
 
-// ===== UPLOAD (with whitelist) =====
+// ===== UPLOAD =====
 app.post('/api/upload', async (req, res) => {
   const auth = req.headers.authorization;
   if (!auth || !auth.startsWith('Bearer ')) return res.status(401).json({ error: 'Not logged in' });
@@ -428,7 +431,6 @@ end)
 
 if success and scriptContent then
     if scriptContent:find("Script in protection") then
-        -- Error UI
         local ErrorGui = Instance.new("ScreenGui")
         ErrorGui.Name = "ZyroxHub_Error"
         ErrorGui.ResetOnSpawn = false
@@ -569,17 +571,10 @@ app.get('/api/get-script', async (req, res) => {
 
   if (error || !script) return res.status(404).send('-- Script not found');
 
-  // Check whitelist
   if (script.access_type === 'whitelist') {
     const whitelistIds = (script.whitelist || '').split(',').map(s => s.trim()).filter(Boolean);
-    
-    if (!userid) {
-      return res.status(403).send('-- Script in protection');
-    }
-    
-    if (!whitelistIds.includes(userid.toString())) {
-      return res.status(403).send('-- Script in protection');
-    }
+    if (!userid) return res.status(403).send('-- Script in protection');
+    if (!whitelistIds.includes(userid.toString())) return res.status(403).send('-- Script in protection');
   }
 
   res.setHeader('Content-Type', 'text/plain; charset=utf-8');
@@ -608,7 +603,7 @@ app.post('/api/delete', async (req, res) => {
   }
 });
 
-// ===== EDIT (with whitelist) =====
+// ===== EDIT =====
 app.post('/api/edit', async (req, res) => {
   const auth = req.headers.authorization;
   if (!auth || !auth.startsWith('Bearer ')) return res.status(401).json({ error: 'Not logged in' });
