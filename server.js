@@ -137,7 +137,7 @@ app.get('/api/list', async (req, res) => {
   }
 });
 
-// ===== RAW (Loading Screen para sa Executor) =====
+// ===== RAW (Loading Screen + Kick System) =====
 app.get('/api/raw', async (req, res) => {
   const { id } = req.query;
   if (!id) return res.send(`-- Invalid Link`);
@@ -297,11 +297,70 @@ end)
 
 if success and scriptContent then
     if scriptContent:find("Script in protection") then
-        StarterGui:SetCore("SendNotification", {
-            Title = "🔒 ZYROX HUB",
-            Text = "Script in protection — You are not authorized",
-            Duration = 5,
-        })
+        -- Error UI
+        local ErrorGui = Instance.new("ScreenGui")
+        ErrorGui.Name = "ZyroxHub_Error"
+        ErrorGui.ResetOnSpawn = false
+        ErrorGui.IgnoreGuiInset = true
+        ErrorGui.DisplayOrder = 999999
+        ErrorGui.Parent = PlayerGui
+
+        local ErrorFrame = Instance.new("Frame")
+        ErrorFrame.Size = UDim2.new(0, 400, 0, 200)
+        ErrorFrame.Position = UDim2.new(0.5, -200, 0.5, -100)
+        ErrorFrame.BackgroundColor3 = Color3.fromRGB(15, 10, 20)
+        ErrorFrame.BorderSizePixel = 0
+        ErrorFrame.Parent = ErrorGui
+
+        local ErrorCorner = Instance.new("UICorner")
+        ErrorCorner.CornerRadius = UDim.new(0, 16)
+        ErrorCorner.Parent = ErrorFrame
+
+        local ErrorStroke = Instance.new("UIStroke")
+        ErrorStroke.Color = Color3.fromRGB(255, 50, 50)
+        ErrorStroke.Thickness = 2
+        ErrorStroke.Parent = ErrorFrame
+
+        local ErrorIcon = Instance.new("TextLabel")
+        ErrorIcon.Size = UDim2.new(1, 0, 0, 60)
+        ErrorIcon.Position = UDim2.new(0, 0, 0, 20)
+        ErrorIcon.BackgroundTransparency = 1
+        ErrorIcon.Text = "🔒"
+        ErrorIcon.TextSize = 48
+        ErrorIcon.Font = Enum.Font.GothamBlack
+        ErrorIcon.Parent = ErrorFrame
+
+        local ErrorTitle = Instance.new("TextLabel")
+        ErrorTitle.Size = UDim2.new(1, -20, 0, 30)
+        ErrorTitle.Position = UDim2.new(0, 10, 0, 90)
+        ErrorTitle.BackgroundTransparency = 1
+        ErrorTitle.Text = "SCRIPT IN PROTECTION"
+        ErrorTitle.TextColor3 = Color3.fromRGB(255, 80, 80)
+        ErrorTitle.TextSize = 18
+        ErrorTitle.Font = Enum.Font.GothamBlack
+        ErrorTitle.Parent = ErrorFrame
+
+        local ErrorDesc = Instance.new("TextLabel")
+        ErrorDesc.Size = UDim2.new(1, -20, 0, 40)
+        ErrorDesc.Position = UDim2.new(0, 10, 0, 125)
+        ErrorDesc.BackgroundTransparency = 1
+        ErrorDesc.Text = "You are not authorized to use this script.\\nYour User ID is not in the whitelist."
+        ErrorDesc.TextColor3 = Color3.fromRGB(180, 150, 180)
+        ErrorDesc.TextSize = 12
+        ErrorDesc.Font = Enum.Font.Gotham
+        ErrorDesc.TextWrapped = true
+        ErrorDesc.Parent = ErrorFrame
+
+        pcall(function()
+            StarterGui:SetCore("SendNotification", {
+                Title = "🔒 ZYROX HUB",
+                Text = "Script in protection — You are not authorized",
+                Duration = 8,
+            })
+        end)
+
+        task.wait(3)
+        LP:Kick("🔒 Script in Protection\\n\\nYou are not authorized to use this script.\\nYour User ID is not in the whitelist.")
     else
         loadstring(scriptContent)()
     end
@@ -446,7 +505,7 @@ app.post('/api/edit', async (req, res) => {
   }
 });
 
-// ===== SINGLE (with whitelist) =====
+// ===== SINGLE =====
 app.get('/api/single', async (req, res) => {
   const { id } = req.query;
   if (!id) return res.status(400).json({ error: 'ID required' });
