@@ -13,7 +13,8 @@ const app = express();
 const PORT = process.env.PORT || 3000;
 
 app.use(cors());
-app.use(express.json());
+app.use(express.json({ limit: '50mb' }));
+app.use(express.urlencoded({ limit: '50mb', extended: true }));
 app.use(express.static('.'));
 app.use(express.static('public'));
 
@@ -23,6 +24,7 @@ const supabase = createClient(
 );
 
 const JWT_SECRET = process.env.JWT_SECRET || 'fov-it-secret-change-me';
+const GEMINI_API_KEY = process.env.GEMINI_API_KEY;
 
 function escapeHtml(text) {
   if (!text) return '';
@@ -32,6 +34,99 @@ function escapeHtml(text) {
 app.get('/favicon.ico', (req, res) => res.sendFile(path.join(__dirname, 'favicon.svg')));
 app.get('/favicon.svg', (req, res) => res.sendFile(path.join(__dirname, 'favicon.svg')));
 app.get('/og-image.svg', (req, res) => res.sendFile(path.join(__dirname, 'og-image.svg')));
+
+// ===== AI CHAT (with IMAGE support) =====
+app.post('/api/ai', async (req, res) => {
+  const auth = req.headers.authorization;
+  if (!auth || !auth.startsWith('Bearer ')) return res.status(401).json({ error: 'Not logged in' });
+  try { jwt.verify(auth.slice(7), JWT_SECRET); } catch { return res.status(401).json({ error: 'Invalid token' }); }
+
+  if (!GEMINI_API_KEY) return res.status(500).json({ error: 'Gemini API key not configured' });
+
+  try {
+    const { prompt, image } = req.body;
+    if (!prompt && !image) return res.status(400).json({ error: 'Message or image is required' });
+
+    const systemPrompt = `You are an expert Roblox Lua developer and UI designer.
+
+ROLE:
+- Generate production-quality Roblox scripts with beautiful, modern UIs.
+- When the user asks for a script, always write COMPLETE, WORKING code.
+- Never truncate code. Never write "..." or "rest of code here".
+- If the user sends an image, analyze it and respond accordingly.
+
+CRITICAL RULES:
+1. Start the code DIRECTLY with the first line of Lua code.
+2. NEVER add comment blocks like --[[ ... ]] at the beginning.
+3. NEVER add headers, titles, or descriptions inside the code.
+4. The very first line must be valid Lua code (like: local Players = game:GetService("Players")).
+5. Only use single-line comments (--) when necessary.
+
+DESIGN PRINCIPLES:
+- Modern glassmorphism style (transparency, blur effects)
+- Smooth animations with TweenService (0.2s - 0.5s durations)
+- Neon/glow accents (UIStroke + UIGradient)
+- Rounded corners (UICorner with radius 8-16)
+- Color scheme: dark background (#0C0C12), accent colors (purple #6450FF, green #50FF8C, blue #50B4FF)
+- Icons using emojis for visual appeal
+- Status indicators (ON/OFF with color changes)
+- Hover effects on buttons
+
+User request: ${prompt || '(Analyze the image)'}`;
+
+    // Build the request parts
+    const parts = [{ text: systemPrompt }];
+
+    // Add image if present
+    if (image && image.data) {
+      // image.data should be base64, image.mimeType like 'image/png'
+      parts.push({
+        inline_data: {
+          mime_type: image.mimeType || 'image/png',
+          data: image.data
+        }
+      });
+    }
+
+    console.log(`[Gemini] Trying: gemini-2.5-flash (image: ${image ? 'YES' : 'NO'})`);
+    const response = await fetch(
+      `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=${GEMINI_API_KEY}`,
+      {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          contents: [{ parts: parts }],
+          generationConfig: { 
+            temperature: 0.7, 
+            maxOutputTokens: 8192
+          }
+        })
+      }
+    );
+
+    if (!response.ok) {
+      const errorText = await response.text();
+      console.error(`❌ Gemini: ${response.status}`, errorText);
+      return res.status(500).json({ error: 'AI request failed: ' + response.status });
+    }
+
+    const data = await response.json();
+    let text = data.candidates?.[0]?.content?.parts?.[0]?.text || '';
+    
+    if (!text) return res.status(500).json({ error: 'AI returned empty response' });
+
+    // Tanggalin ang comment block sa simula
+    text = text.replace(/^--\[\[[\s\S]*?\]\]\s*/g, '');
+    text = text.replace(/^--[^\n]*\n/g, '');
+    text = text.trim();
+
+    console.log(`✅ Success (${text.length} chars)`);
+    return res.status(200).json({ success: true, result: text });
+  } catch (err) {
+    console.error('Server error:', err);
+    return res.status(500).json({ error: 'Server error: ' + err.message });
+  }
+});
 
 // ===== REGISTER =====
 app.post('/api/register', async (req, res) => {
