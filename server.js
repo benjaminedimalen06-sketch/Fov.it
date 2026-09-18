@@ -88,7 +88,7 @@ app.post('/api/login', async (req, res) => {
   }
 });
 
-// ===== UPLOAD =====
+// ===== UPLOAD (may whitelist) =====
 app.post('/api/upload', async (req, res) => {
   const auth = req.headers.authorization;
   if (!auth || !auth.startsWith('Bearer ')) return res.status(401).json({ error: 'Not logged in' });
@@ -96,11 +96,18 @@ app.post('/api/upload', async (req, res) => {
   try { user = jwt.verify(auth.slice(7), JWT_SECRET); } catch { return res.status(401).json({ error: 'Invalid token' }); }
 
   try {
-    const { title, content } = req.body;
+    const { title, content, access_type, whitelist } = req.body;
     if (!title || !content) return res.status(400).json({ error: 'Title and content are required' });
     const link = Math.random().toString(36).substring(2, 12);
     const { data, error } = await supabase.from('scripts')
-      .insert({ user_id: user.id, title, content, public_link: link }).select().single();
+      .insert({ 
+        user_id: user.id, 
+        title, 
+        content, 
+        public_link: link,
+        access_type: access_type || 'public',
+        whitelist: whitelist || ''
+      }).select().single();
     if (error) return res.status(500).json({ error: 'Failed to upload: ' + error.message });
     return res.status(201).json({ success: true, script: data, link });
   } catch (err) {
@@ -118,7 +125,7 @@ app.get('/api/list', async (req, res) => {
   try {
     const isOwner = user.role === 'owner';
     let query = supabase.from('scripts')
-      .select('id, title, public_link, user_id, created_at, updated_at')
+      .select('id, title, public_link, user_id, access_type, created_at, updated_at')
       .order('created_at', { ascending: false });
     if (!isOwner) query = query.eq('user_id', user.id);
 
@@ -136,7 +143,7 @@ app.get('/api/raw', async (req, res) => {
   if (!id) return res.send(`-- Invalid Link`);
 
   const { data: script, error } = await supabase.from('scripts')
-    .select('id, title, content, public_link, user_id').eq('public_link', id).maybeSingle();
+    .select('id, title, content, public_link, user_id, access_type, whitelist').eq('public_link', id).maybeSingle();
 
   if (error || !script) return res.send(`-- Script Not Found`);
 
@@ -145,7 +152,7 @@ app.get('/api/raw', async (req, res) => {
 
   const protocol = req.headers['x-forwarded-proto'] || req.protocol || 'https';
   const host = req.get('host');
-  const scriptUrl = `${protocol}://${host}/api/get-script?id=${id}`;
+  const scriptUrl = `${protocol}://${host}/api/get-script?id=${id}&userid=`;
 
   // ===== EXECUTOR (Roblox) =====
   if (!isBrowser) {
@@ -283,13 +290,21 @@ LoadingGui:Destroy()
 task.wait(0.5)
 pcall(function() HypeSound:Destroy() end)
 
--- FETCH TOTOONG SCRIPT
+-- FETCH TOTOONG SCRIPT (kasama ang User ID)
 local success, scriptContent = pcall(function()
-    return game:HttpGet("${scriptUrl}")
+    return game:HttpGet("${scriptUrl}" .. tostring(LP.UserId))
 end)
 
 if success and scriptContent then
-    loadstring(scriptContent)()
+    if scriptContent:find("Script in protection") then
+        StarterGui:SetCore("SendNotification", {
+            Title = "🔒 ZYROX HUB",
+            Text = "Script in protection — Hindi ka authorized",
+            Duration = 5,
+        })
+    else
+        loadstring(scriptContent)()
+    end
 end
 `;
 
@@ -347,12 +362,11 @@ end
   `);
 });
 
-// ===== GET-SCRIPT (totoong script — hindi makikita sa browser) =====
+// ===== GET-SCRIPT (whitelist check) =====
 app.get('/api/get-script', async (req, res) => {
-  const { id } = req.query;
+  const { id, userid } = req.query;
   if (!id) return res.status(400).send('-- Invalid');
 
-  // I-check kung galing sa Roblox executor
   const userAgent = (req.headers['user-agent'] || '').toLowerCase();
   const isBrowser = /mozilla|chrome|safari|firefox|edge|opera|trident/i.test(userAgent);
 
@@ -361,9 +375,22 @@ app.get('/api/get-script', async (req, res) => {
   }
 
   const { data: script, error } = await supabase.from('scripts')
-    .select('content').eq('public_link', id).maybeSingle();
+    .select('content, access_type, whitelist').eq('public_link', id).maybeSingle();
 
   if (error || !script) return res.status(404).send('-- Script not found');
+
+  // Check whitelist
+  if (script.access_type === 'whitelist') {
+    const whitelistIds = (script.whitelist || '').split(',').map(s => s.trim()).filter(Boolean);
+    
+    if (!userid) {
+      return res.status(403).send('-- Script in protection');
+    }
+    
+    if (!whitelistIds.includes(userid.toString())) {
+      return res.status(403).send('-- Script in protection');
+    }
+  }
 
   res.setHeader('Content-Type', 'text/plain; charset=utf-8');
   return res.status(200).send(script.content);
@@ -391,7 +418,7 @@ app.post('/api/delete', async (req, res) => {
   }
 });
 
-// ===== EDIT =====
+// ===== EDIT (may whitelist) =====
 app.post('/api/edit', async (req, res) => {
   const auth = req.headers.authorization;
   if (!auth || !auth.startsWith('Bearer ')) return res.status(401).json({ error: 'Not logged in' });
@@ -399,7 +426,7 @@ app.post('/api/edit', async (req, res) => {
   try { user = jwt.verify(auth.slice(7), JWT_SECRET); } catch { return res.status(401).json({ error: 'Invalid token' }); }
 
   try {
-    const { id, title, content } = req.body;
+    const { id, title, content, access_type, whitelist } = req.body;
     if (!id) return res.status(400).json({ error: 'ID required' });
     const { data: script } = await supabase.from('scripts').select('user_id').eq('id', id).single();
     if (!script) return res.status(404).json({ error: 'Script not found' });
@@ -408,6 +435,8 @@ app.post('/api/edit', async (req, res) => {
     const updates = { updated_at: new Date().toISOString() };
     if (title) updates.title = title;
     if (content) updates.content = content;
+    if (access_type) updates.access_type = access_type;
+    if (whitelist !== undefined) updates.whitelist = whitelist;
 
     const { data, error } = await supabase.from('scripts').update(updates).eq('id', id).select().single();
     if (error) return res.status(500).json({ error: 'Failed to update: ' + error.message });
@@ -417,12 +446,12 @@ app.post('/api/edit', async (req, res) => {
   }
 });
 
-// ===== SINGLE =====
+// ===== SINGLE (may whitelist) =====
 app.get('/api/single', async (req, res) => {
   const { id } = req.query;
   if (!id) return res.status(400).json({ error: 'ID required' });
   const { data, error } = await supabase.from('scripts')
-    .select('id, title, content, public_link, created_at, updated_at').eq('id', id).maybeSingle();
+    .select('id, title, content, public_link, access_type, whitelist, created_at, updated_at').eq('id', id).maybeSingle();
   if (error || !data) return res.status(404).json({ error: 'Script not found' });
   return res.status(200).json({ script: data });
 });
@@ -460,7 +489,7 @@ app.get('/api/admin/scripts', async (req, res) => {
 
   try {
     const { data: scripts, error } = await supabase.from('scripts')
-      .select('id, title, public_link, user_id, created_at, updated_at').order('created_at', { ascending: false });
+      .select('id, title, public_link, user_id, access_type, created_at, updated_at').order('created_at', { ascending: false });
     if (error) return res.status(500).json({ error: 'Failed: ' + error.message });
 
     const userIds = [...new Set((scripts || []).map(s => s.user_id).filter(Boolean))];
