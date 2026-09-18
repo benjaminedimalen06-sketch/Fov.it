@@ -24,7 +24,6 @@ const supabase = createClient(
 );
 
 const JWT_SECRET = process.env.JWT_SECRET || 'fov-it-secret-change-me';
-const GEMINI_API_KEY = process.env.GEMINI_API_KEY;
 
 function escapeHtml(text) {
   if (!text) return '';
@@ -35,19 +34,20 @@ app.get('/favicon.ico', (req, res) => res.sendFile(path.join(__dirname, 'favicon
 app.get('/favicon.svg', (req, res) => res.sendFile(path.join(__dirname, 'favicon.svg')));
 app.get('/og-image.svg', (req, res) => res.sendFile(path.join(__dirname, 'og-image.svg')));
 
-// ===== AI CHAT (with IMAGE support) =====
+// ===== AI CHAT (OpenRouter — dynamic free models) =====
 app.post('/api/ai', async (req, res) => {
   const auth = req.headers.authorization;
   if (!auth || !auth.startsWith('Bearer ')) return res.status(401).json({ error: 'Not logged in' });
   try { jwt.verify(auth.slice(7), JWT_SECRET); } catch { return res.status(401).json({ error: 'Invalid token' }); }
 
-  if (!GEMINI_API_KEY) return res.status(500).json({ error: 'Gemini API key not configured' });
+  const OPENROUTER_API_KEY = process.env.OPENROUTER_API_KEY;
+  if (!OPENROUTER_API_KEY) return res.status(500).json({ error: 'OpenRouter API key not configured' });
 
   try {
     const { prompt, image } = req.body;
     if (!prompt && !image) return res.status(400).json({ error: 'Message or image is required' });
 
-    const systemPrompt = `You are an expert Roblox Lua developer and UI designer.
+    const systemPrompt = `You are Fov.it AI — an expert Roblox Lua developer and UI designer.
 
 ROLE:
 - Generate production-quality Roblox scripts with beautiful, modern UIs.
@@ -74,54 +74,90 @@ DESIGN PRINCIPLES:
 
 User request: ${prompt || '(Analyze the image)'}`;
 
-    // Build the request parts
-    const parts = [{ text: systemPrompt }];
-
-    // Add image if present
-    if (image && image.data) {
-      // image.data should be base64, image.mimeType like 'image/png'
-      parts.push({
-        inline_data: {
-          mime_type: image.mimeType || 'image/png',
-          data: image.data
-        }
-      });
-    }
-
-    console.log(`[Gemini] Trying: gemini-2.5-flash (image: ${image ? 'YES' : 'NO'})`);
-    const response = await fetch(
-      `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=${GEMINI_API_KEY}`,
-      {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          contents: [{ parts: parts }],
-          generationConfig: { 
-            temperature: 0.7, 
-            maxOutputTokens: 8192
-          }
-        })
-      }
-    );
-
-    if (!response.ok) {
-      const errorText = await response.text();
-      console.error(`❌ Gemini: ${response.status}`, errorText);
-      return res.status(500).json({ error: 'AI request failed: ' + response.status });
-    }
-
-    const data = await response.json();
-    let text = data.candidates?.[0]?.content?.parts?.[0]?.text || '';
+    // Build messages array
+    const messages = [{ role: 'system', content: systemPrompt }];
     
-    if (!text) return res.status(500).json({ error: 'AI returned empty response' });
+    if (image && image.data) {
+      messages.push({
+        role: 'user',
+        content: [
+          { type: 'text', text: prompt || '(Analyze this image)' },
+          { type: 'image_url', image_url: { url: `data:${image.mimeType};base64,${image.data}` } }
+        ]
+      });
+    } else {
+      messages.push({ role: 'user', content: prompt });
+    }
 
-    // Tanggalin ang comment block sa simula
-    text = text.replace(/^--\[\[[\s\S]*?\]\]\s*/g, '');
-    text = text.replace(/^--[^\n]*\n/g, '');
-    text = text.trim();
+    // Get available free models
+    let freeModels = [];
+    try {
+      const modelsRes = await fetch('https://openrouter.ai/api/v1/models');
+      if (modelsRes.ok) {
+        const modelsData = await modelsRes.json();
+        freeModels = (modelsData.data || [])
+          .filter(m => m.id && m.id.includes(':free'))
+          .map(m => m.id)
+          .slice(0, 5);
+      }
+    } catch (e) { console.error('Models fetch failed:', e.message); }
 
-    console.log(`✅ Success (${text.length} chars)`);
-    return res.status(200).json({ success: true, result: text });
+    if (freeModels.length === 0) {
+      freeModels = [
+        'inclusionai/ling-3.0-flash-vl:free',
+        'nex-agi/nex-n2.5-pro:free',
+        'nex-agi/nex-n2.5-mini:free'
+      ];
+    }
+
+    let generatedText = null;
+    let lastError = null;
+
+    for (const model of freeModels) {
+      try {
+        console.log(`[OpenRouter] Trying: ${model}`);
+        const response = await fetch('https://openrouter.ai/api/v1/chat/completions', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'Authorization': `Bearer ${OPENROUTER_API_KEY}`,
+            'HTTP-Referer': 'https://fov-it.onrender.com',
+            'X-Title': 'Fov.it AI'
+          },
+          body: JSON.stringify({
+            model: model,
+            messages: messages,
+            temperature: 0.7,
+            max_tokens: 8192
+          })
+        });
+
+        if (response.ok) {
+          const data = await response.json();
+          let text = data.choices?.[0]?.message?.content || '';
+          if (text) {
+            text = text.replace(/^--\[\[[\s\S]*?\]\]\s*/g, '');
+            text = text.trim();
+            console.log(`✅ OpenRouter success: ${model}`);
+            generatedText = text;
+            break;
+          }
+        } else {
+          const errText = await response.text();
+          console.error(`❌ OpenRouter ${model}: ${response.status}`, errText);
+          lastError = `${model}: ${response.status}`;
+        }
+      } catch (err) {
+        console.error(`❌ OpenRouter ${model}: ${err.message}`);
+        lastError = `${model}: ${err.message}`;
+      }
+    }
+
+    if (!generatedText) {
+      return res.status(503).json({ error: 'AI busy. Try again. (' + (lastError || 'failed') + ')' });
+    }
+
+    return res.status(200).json({ success: true, result: generatedText });
   } catch (err) {
     console.error('Server error:', err);
     return res.status(500).json({ error: 'Server error: ' + err.message });
