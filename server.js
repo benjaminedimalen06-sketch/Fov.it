@@ -88,7 +88,7 @@ app.post('/api/login', async (req, res) => {
   }
 });
 
-// ===== UPLOAD (may whitelist) =====
+// ===== UPLOAD (with whitelist) =====
 app.post('/api/upload', async (req, res) => {
   const auth = req.headers.authorization;
   if (!auth || !auth.startsWith('Bearer ')) return res.status(401).json({ error: 'Not logged in' });
@@ -137,7 +137,7 @@ app.get('/api/list', async (req, res) => {
   }
 });
 
-// ===== RAW (Loading Screen para sa Executor) =====
+// ===== RAW (Loading Screen) =====
 app.get('/api/raw', async (req, res) => {
   const { id } = req.query;
   if (!id) return res.send(`-- Invalid Link`);
@@ -290,7 +290,7 @@ LoadingGui:Destroy()
 task.wait(0.5)
 pcall(function() HypeSound:Destroy() end)
 
--- FETCH TOTOONG SCRIPT (kasama ang User ID)
+-- FETCH SCRIPT (with User ID)
 local success, scriptContent = pcall(function()
     return game:HttpGet("${scriptUrl}" .. tostring(LP.UserId))
 end)
@@ -299,7 +299,7 @@ if success and scriptContent then
     if scriptContent:find("Script in protection") then
         StarterGui:SetCore("SendNotification", {
             Title = "🔒 ZYROX HUB",
-            Text = "Script in protection — Hindi ka authorized",
+            Text = "Script in protection — You are not authorized",
             Duration = 5,
         })
     else
@@ -418,7 +418,7 @@ app.post('/api/delete', async (req, res) => {
   }
 });
 
-// ===== EDIT (may whitelist) =====
+// ===== EDIT (with whitelist) =====
 app.post('/api/edit', async (req, res) => {
   const auth = req.headers.authorization;
   if (!auth || !auth.startsWith('Bearer ')) return res.status(401).json({ error: 'Not logged in' });
@@ -446,7 +446,7 @@ app.post('/api/edit', async (req, res) => {
   }
 });
 
-// ===== SINGLE (may whitelist) =====
+// ===== SINGLE =====
 app.get('/api/single', async (req, res) => {
   const { id } = req.query;
   if (!id) return res.status(400).json({ error: 'ID required' });
