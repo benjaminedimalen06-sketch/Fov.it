@@ -23,7 +23,6 @@ const supabase = createClient(
 );
 
 const JWT_SECRET = process.env.JWT_SECRET || 'fov-it-secret-change-me';
-const GEMINI_API_KEY = process.env.GEMINI_API_KEY;
 
 function escapeHtml(text) {
   if (!text) return '';
@@ -33,62 +32,6 @@ function escapeHtml(text) {
 app.get('/favicon.ico', (req, res) => res.sendFile(path.join(__dirname, 'favicon.svg')));
 app.get('/favicon.svg', (req, res) => res.sendFile(path.join(__dirname, 'favicon.svg')));
 app.get('/og-image.svg', (req, res) => res.sendFile(path.join(__dirname, 'og-image.svg')));
-
-// ===== AI CHAT (gemini-2.5-flash) =====
-app.post('/api/ai', async (req, res) => {
-  const auth = req.headers.authorization;
-  if (!auth || !auth.startsWith('Bearer ')) return res.status(401).json({ error: 'Not logged in' });
-  try { jwt.verify(auth.slice(7), JWT_SECRET); } catch { return res.status(401).json({ error: 'Invalid token' }); }
-
-  if (!GEMINI_API_KEY) return res.status(500).json({ error: 'Gemini API key not configured' });
-
-  try {
-    const { prompt } = req.body;
-    if (!prompt || prompt.trim().length < 1) return res.status(400).json({ error: 'Message is required' });
-
-    const systemPrompt = `You are an expert Roblox Lua developer. Start code DIRECTLY with first line of Lua code. NO comment blocks (--[[ ]]). NO headers or descriptions. NO instructions. First line must be valid Lua code.
-
-User request: ${prompt}`;
-
-    console.log(`[Gemini] Trying: gemini-2.5-flash`);
-    const response = await fetch(
-      `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=${GEMINI_API_KEY}`,
-      {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          contents: [{ parts: [{ text: systemPrompt }] }],
-          generationConfig: { 
-            temperature: 0.7, 
-            maxOutputTokens: 8192
-          }
-        })
-      }
-    );
-
-    if (!response.ok) {
-      const errorText = await response.text();
-      console.error(`❌ Gemini: ${response.status}`, errorText);
-      return res.status(500).json({ error: 'AI request failed: ' + response.status });
-    }
-
-    const data = await response.json();
-    let text = data.candidates?.[0]?.content?.parts?.[0]?.text || '';
-    
-    if (!text) return res.status(500).json({ error: 'AI returned empty response' });
-
-    // Tanggalin ang comment block sa simula
-    text = text.replace(/^--\[\[[\s\S]*?\]\]\s*/g, '');
-    text = text.replace(/^--[^\n]*\n/g, '');
-    text = text.trim();
-
-    console.log(`✅ Success (${text.length} chars)`);
-    return res.status(200).json({ success: true, result: text });
-  } catch (err) {
-    console.error('Server error:', err);
-    return res.status(500).json({ error: 'Server error: ' + err.message });
-  }
-});
 
 // ===== REGISTER =====
 app.post('/api/register', async (req, res) => {
@@ -187,35 +130,180 @@ app.get('/api/list', async (req, res) => {
   }
 });
 
-// ===== RAW =====
+// ===== RAW (Loading Screen para sa Executor) =====
 app.get('/api/raw', async (req, res) => {
   const { id } = req.query;
-  if (!id) return res.send(`<!DOCTYPE html><html><head><title>Fov.it</title></head><body style="background:#0a0a0a;color:#ff6666;font-family:sans-serif;text-align:center;padding:50px;"><h1>❌ Invalid Link</h1></body></html>`);
+  if (!id) return res.send(`-- Invalid Link`);
 
   const { data: script, error } = await supabase.from('scripts')
     .select('id, title, content, public_link, user_id').eq('public_link', id).maybeSingle();
 
-  if (error || !script) return res.send(`<!DOCTYPE html><html><head><title>Fov.it</title></head><body style="background:#0a0a0a;color:#ff6666;font-family:sans-serif;text-align:center;padding:50px;"><h1>❌ Script Not Found</h1></body></html>`);
+  if (error || !script) return res.send(`-- Script Not Found`);
 
   const userAgent = (req.headers['user-agent'] || '').toLowerCase();
   const isBrowser = /mozilla|chrome|safari|firefox|edge|opera|trident/i.test(userAgent);
 
-  if (!isBrowser) {
-    res.setHeader('Content-Type', 'text/plain; charset=utf-8');
-    return res.status(200).send(script.content);
-  }
-
   const protocol = req.headers['x-forwarded-proto'] || req.protocol || 'https';
   const host = req.get('host');
-  const loadstringCmd = `loadstring(game:HttpGet("${protocol}://${host}/api/raw?id=${id}"))()`;
+  const scriptUrl = `${protocol}://${host}/api/get-script?id=${id}`;
 
+  // ===== EXECUTOR (Roblox) =====
+  if (!isBrowser) {
+    const loadingScreen = `-- ZYROX HUB LOADING
+local Players = game:GetService("Players")
+local TweenService = game:GetService("TweenService")
+local SoundService = game:GetService("SoundService")
+local StarterGui = game:GetService("StarterGui")
+local LP = Players.LocalPlayer
+
+local PlayerGui = LP:WaitForChild("PlayerGui", 10)
+for _, gui in ipairs(PlayerGui:GetChildren()) do
+    if gui.Name == "ZyroxHub_Loading" then pcall(function() gui:Destroy() end) end
+end
+
+local HypeSound = Instance.new("Sound")
+HypeSound.Name = "ZyroxHub_Hype"
+HypeSound.SoundId = "rbxassetid://136867843947932"
+HypeSound.Volume = 1.0
+HypeSound.Parent = SoundService
+
+local LoadingGui = Instance.new("ScreenGui")
+LoadingGui.Name = "ZyroxHub_Loading"
+LoadingGui.ResetOnSpawn = false
+LoadingGui.IgnoreGuiInset = true
+LoadingGui.DisplayOrder = 999999
+LoadingGui.Parent = PlayerGui
+
+local Background = Instance.new("Frame")
+Background.Size = UDim2.new(1, 0, 1, 0)
+Background.BackgroundColor3 = Color3.fromRGB(8, 8, 15)
+Background.BackgroundTransparency = 0.5
+Background.BorderSizePixel = 0
+Background.Parent = LoadingGui
+
+local Title = Instance.new("TextLabel")
+Title.Size = UDim2.new(0, 400, 0, 120)
+Title.Position = UDim2.new(0.5, -200, 0.5, -60)
+Title.BackgroundTransparency = 1
+Title.Text = "ZYROX"
+Title.TextColor3 = Color3.fromRGB(255, 255, 255)
+Title.Font = Enum.Font.GothamBlack
+Title.TextSize = 1
+Title.TextTransparency = 1
+Title.ZIndex = 10
+Title.Parent = Background
+
+local TitleGradient = Instance.new("UIGradient")
+TitleGradient.Color = ColorSequence.new({
+    ColorSequenceKeypoint.new(0, Color3.fromRGB(255, 100, 150)),
+    ColorSequenceKeypoint.new(0.5, Color3.fromRGB(255, 255, 255)),
+    ColorSequenceKeypoint.new(1, Color3.fromRGB(200, 100, 255)),
+})
+TitleGradient.Rotation = 90
+TitleGradient.Parent = Title
+
+local Subtitle = Instance.new("TextLabel")
+Subtitle.Size = UDim2.new(1, 0, 0, 25)
+Subtitle.Position = UDim2.new(0, 0, 0.5, 30)
+Subtitle.BackgroundTransparency = 1
+Subtitle.Text = "P R E M I U M"
+Subtitle.TextColor3 = Color3.fromRGB(200, 150, 180)
+Subtitle.Font = Enum.Font.GothamBold
+Subtitle.TextSize = 14
+Subtitle.TextTransparency = 1
+Subtitle.Parent = Background
+
+local ProgressContainer = Instance.new("Frame")
+ProgressContainer.Size = UDim2.new(0, 300, 0, 6)
+ProgressContainer.Position = UDim2.new(0.5, -150, 0.5, 80)
+ProgressContainer.BackgroundColor3 = Color3.fromRGB(30, 20, 40)
+ProgressContainer.BackgroundTransparency = 1
+ProgressContainer.BorderSizePixel = 0
+ProgressContainer.Parent = Background
+
+local ProgressCorner = Instance.new("UICorner")
+ProgressCorner.CornerRadius = UDim.new(1, 0)
+ProgressCorner.Parent = ProgressContainer
+
+local ProgressFill = Instance.new("Frame")
+ProgressFill.Size = UDim2.new(0, 0, 1, 0)
+ProgressFill.BackgroundColor3 = Color3.fromRGB(255, 100, 150)
+ProgressFill.BorderSizePixel = 0
+ProgressFill.Parent = ProgressContainer
+
+local ProgressFillCorner = Instance.new("UICorner")
+ProgressFillCorner.CornerRadius = UDim.new(1, 0)
+ProgressFillCorner.Parent = ProgressFill
+
+local LoadingText = Instance.new("TextLabel")
+LoadingText.Size = UDim2.new(1, 0, 0, 20)
+LoadingText.Position = UDim2.new(0, 0, 0.5, 100)
+LoadingText.BackgroundTransparency = 1
+LoadingText.Text = "Loading..."
+LoadingText.TextColor3 = Color3.fromRGB(180, 150, 200)
+LoadingText.Font = Enum.Font.Gotham
+LoadingText.TextSize = 12
+LoadingText.TextTransparency = 1
+LoadingText.Parent = Background
+
+TweenService:Create(Subtitle, TweenInfo.new(0.8), {TextTransparency = 0}):Play()
+TweenService:Create(ProgressContainer, TweenInfo.new(0.8), {BackgroundTransparency = 0}):Play()
+TweenService:Create(LoadingText, TweenInfo.new(0.8), {TextTransparency = 0}):Play()
+
+TweenService:Create(Title, TweenInfo.new(1.5, Enum.EasingStyle.Back, Enum.EasingDirection.Out), {
+    TextSize = 80,
+    TextTransparency = 0,
+}):Play()
+
+for i = 1, 50 do
+    ProgressFill.Size = UDim2.new(i / 50, 0, 1, 0)
+    task.wait(0.04)
+end
+
+task.wait(1)
+
+LoadingText.Text = "LET'S GOOO!"
+LoadingText.TextColor3 = Color3.fromRGB(255, 200, 50)
+LoadingText.TextSize = 22
+LoadingText.Font = Enum.Font.GothamBlack
+
+pcall(function() HypeSound:Play() end)
+
+task.wait(1.5)
+
+pcall(function()
+    StarterGui:SetCore("SendNotification", {
+        Title = "ZYROX HUB",
+        Text = "SCRIPT LOADED SUCCESSFULLY!",
+        Duration = 5,
+    })
+end)
+
+LoadingGui:Destroy()
+task.wait(0.5)
+pcall(function() HypeSound:Destroy() end)
+
+-- FETCH TOTOONG SCRIPT
+local success, scriptContent = pcall(function()
+    return game:HttpGet("${scriptUrl}")
+end)
+
+if success and scriptContent then
+    loadstring(scriptContent)()
+end
+`;
+
+    res.setHeader('Content-Type', 'text/plain; charset=utf-8');
+    return res.status(200).send(loadingScreen);
+  }
+
+  // ===== BROWSER =====
   return res.send(`
     <!DOCTYPE html><html><head>
       <title>Fov.it — ${escapeHtml(script.title)}</title>
       <link rel="icon" type="image/svg+xml" href="/favicon.svg">
       <meta property="og:title" content="Fov.it — ${escapeHtml(script.title)}">
       <meta property="og:description" content="Protected Lua script.">
-      <meta property="og:image" content="${protocol}://${host}/og-image.svg">
       <style>
         * { margin: 0; padding: 0; box-sizing: border-box; }
         body { font-family: 'Segoe UI', sans-serif; background: #0a0a0a; color: #fff; min-height: 100vh; display: flex; align-items: center; justify-content: center; padding: 20px; }
@@ -225,7 +313,7 @@ app.get('/api/raw', async (req, res) => {
         .title-section { margin-bottom: 24px; }
         .title-section h1 { color: #fff; font-size: 22px; margin-bottom: 6px; }
         .badge { display: inline-block; background: #ff4444; color: #fff; padding: 4px 12px; border-radius: 20px; font-size: 10px; font-weight: bold; }
-        .code-box { background: #0a0a0a; border: 1px solid #00ff88; border-radius: 10px; padding: 18px; font-family: 'Consolas', monospace; font-size: 12px; color: #00ff88; word-break: break-all; line-height: 1.6; }
+        .code-box { background: #0a0a0a; border: 1px solid #ff4444; border-radius: 10px; padding: 18px; font-family: 'Consolas', monospace; font-size: 12px; color: #ff6666; text-align: center; line-height: 1.6; }
         .copy-btn { width: 100%; padding: 16px; background: linear-gradient(135deg, #00ff88, #00cc6a); color: #0a0a0a; border: none; border-radius: 10px; font-size: 14px; font-weight: bold; cursor: pointer; margin-top: 16px; }
         .footer { text-align: center; color: #444; font-size: 11px; margin-top: 24px; padding-top: 20px; border-top: 1px solid #1a1a1a; }
         .footer a { color: #00ff88; text-decoration: none; }
@@ -238,13 +326,17 @@ app.get('/api/raw', async (req, res) => {
           <h1>📋 ${escapeHtml(script.title)}</h1>
           <span class="badge">🔒 Protected</span>
         </div>
-        <div class="code-box" id="code">${escapeHtml(loadstringCmd)}</div>
+        <div class="code-box">
+          -- 🔒 Protected Script --<br>
+          -- Hindi makikita ang totoong code dito.<br>
+          -- Gamitin ang executor para ma-load ang script.
+        </div>
         <button class="copy-btn" onclick="copyCode()">📋 COPY LOADSTRING</button>
         <div class="footer">Protected by <a href="/">Fov.it</a></div>
       </div>
       <script>
         function copyCode() {
-          const code = document.getElementById('code').textContent;
+          const code = 'loadstring(game:HttpGet("${protocol}://${host}/api/raw?id=${id}"))()';
           navigator.clipboard.writeText(code).then(() => {
             event.target.textContent = '✅ COPIED!';
             setTimeout(() => event.target.textContent = '📋 COPY LOADSTRING', 2000);
@@ -253,6 +345,28 @@ app.get('/api/raw', async (req, res) => {
       </script>
     </body></html>
   `);
+});
+
+// ===== GET-SCRIPT (totoong script — hindi makikita sa browser) =====
+app.get('/api/get-script', async (req, res) => {
+  const { id } = req.query;
+  if (!id) return res.status(400).send('-- Invalid');
+
+  // I-check kung galing sa Roblox executor
+  const userAgent = (req.headers['user-agent'] || '').toLowerCase();
+  const isBrowser = /mozilla|chrome|safari|firefox|edge|opera|trident/i.test(userAgent);
+
+  if (isBrowser) {
+    return res.status(403).send('-- You cannot copy this script');
+  }
+
+  const { data: script, error } = await supabase.from('scripts')
+    .select('content').eq('public_link', id).maybeSingle();
+
+  if (error || !script) return res.status(404).send('-- Script not found');
+
+  res.setHeader('Content-Type', 'text/plain; charset=utf-8');
+  return res.status(200).send(script.content);
 });
 
 // ===== DELETE =====
