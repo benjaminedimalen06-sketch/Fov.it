@@ -30,6 +30,35 @@ function escapeHtml(text) {
   return text.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;').replace(/'/g, '&#039;');
 }
 
+/**
+ * 🎯 ACCURATE EXECUTOR DETECTION
+ * Returns true kung ang request ay galing sa Roblox Executor
+ */
+function isExecutorRequest(req) {
+  const ua = (req.headers['user-agent'] || '').toLowerCase();
+  
+  // 1. Walang User-Agent = mobile executor (Delta mobile, Codex, etc.)
+  if (!ua || ua.trim() === '') return true;
+  
+  // 2. Roblox client (lahat ng PC executors)
+  if (ua.includes('roblox')) return true;
+  
+  // 3. Known executor keywords
+  const executorKeywords = /delta|solara|xeno|wave|krnl|fluxus|hydrogen|codex|arceus|trigon|sirhurt|synapse|evon|celery|awp|vegas|oxygen|electron|script[- ]?ware|exploit|swift|kosatsu|byfron|macsploit|valyse|sirhurt|potassium|ronin/i;
+  if (executorKeywords.test(ua)) return true;
+  
+  // 4. Manual override via query param: ?exec=1
+  if (req.query.exec === '1' || req.query.exec === 'true') return true;
+  
+  // 5. Custom header (para sa custom executors)
+  if (req.headers['x-executor'] === 'true') return true;
+  
+  // 6. Roblox API domains (kung may header na galing Roblox servers)
+  if (req.headers['x-roblox-id'] || req.headers['roblox-id']) return true;
+  
+  return false;
+}
+
 app.get('/favicon.ico', (req, res) => res.sendFile(path.join(__dirname, 'favicon.svg')));
 app.get('/favicon.svg', (req, res) => res.sendFile(path.join(__dirname, 'favicon.svg')));
 app.get('/og-image.svg', (req, res) => res.sendFile(path.join(__dirname, 'og-image.svg')));
@@ -116,7 +145,7 @@ app.post('/api/upload', async (req, res) => {
   }
 });
 
-// ===== LIST (own scripts only - even for owner) =====
+// ===== LIST =====
 app.get('/api/list', async (req, res) => {
   const auth = req.headers.authorization;
   if (!auth || !auth.startsWith('Bearer ')) return res.status(401).json({ error: 'Not logged in' });
@@ -124,7 +153,6 @@ app.get('/api/list', async (req, res) => {
   try { user = jwt.verify(auth.slice(7), JWT_SECRET); } catch { return res.status(401).json({ error: 'Invalid token' }); }
 
   try {
-    // Lahat ng users (kasama ang owner) ay makikita lang ang SARILING scripts sa dashboard
     const { data, error } = await supabase.from('scripts')
       .select('id, title, public_link, user_id, access_type, created_at, updated_at')
       .eq('user_id', user.id)
@@ -137,7 +165,7 @@ app.get('/api/list', async (req, res) => {
   }
 });
 
-// ===== RAW (Loading Screen + Kick System) =====
+// ===== RAW (MAIN ENDPOINT - Loading Screen + Script) =====
 app.get('/api/raw', async (req, res) => {
   const { id } = req.query;
   if (!id) return res.send(`-- Invalid Link`);
@@ -147,15 +175,14 @@ app.get('/api/raw', async (req, res) => {
 
   if (error || !script) return res.send(`-- Script Not Found`);
 
-  const userAgent = (req.headers['user-agent'] || '').toLowerCase();
-  const isBrowser = /mozilla|chrome|safari|firefox|edge|opera|trident/i.test(userAgent);
-
+  // 🎯 GAMITIN ANG BAGONG DETECTION
+  const isExec = isExecutorRequest(req);
   const protocol = req.headers['x-forwarded-proto'] || req.protocol || 'https';
   const host = req.get('host');
   const scriptUrl = `${protocol}://${host}/api/get-script?id=${id}&userid=`;
 
-  // ===== EXECUTOR (Roblox) =====
-  if (!isBrowser) {
+  // ===== EXECUTOR =====
+  if (isExec) {
     const loadingScreen = `-- ZYROX HUB LOADING
 local Players = game:GetService("Players")
 local TweenService = game:GetService("TweenService")
@@ -290,7 +317,7 @@ LoadingGui:Destroy()
 task.wait(0.5)
 pcall(function() HypeSound:Destroy() end)
 
--- FETCH TOTOONG SCRIPT (kasama ang User ID)
+-- FETCH TOTOONG SCRIPT
 local success, scriptContent = pcall(function()
     return game:HttpGet("${scriptUrl}" .. tostring(LP.UserId))
 end)
@@ -367,6 +394,7 @@ end
 `;
 
     res.setHeader('Content-Type', 'text/plain; charset=utf-8');
+    res.setHeader('Cache-Control', 'no-store');
     return res.status(200).send(loadingScreen);
   }
 
@@ -404,15 +432,15 @@ end
           -- Hindi makikita ang totoong code dito.<br>
           -- Gamitin ang executor para ma-load ang script.
         </div>
-        <button class="copy-btn" onclick="copyCode()">📋 COPY LOADSTRING</button>
+        <button class="copy-btn" onclick="copyCode(event)">📋 COPY LOADSTRING</button>
         <div class="footer">Protected by <a href="/">Fov.it</a></div>
       </div>
       <script>
-        function copyCode() {
+        function copyCode(e) {
           const code = 'loadstring(game:HttpGet("${protocol}://${host}/api/raw?id=${id}"))()';
           navigator.clipboard.writeText(code).then(() => {
-            event.target.textContent = '✅ COPIED!';
-            setTimeout(() => event.target.textContent = '📋 COPY LOADSTRING', 2000);
+            e.target.textContent = '✅ COPIED!';
+            setTimeout(() => e.target.textContent = '📋 COPY LOADSTRING', 2000);
           });
         }
       </script>
@@ -425,10 +453,8 @@ app.get('/api/get-script', async (req, res) => {
   const { id, userid } = req.query;
   if (!id) return res.status(400).send('-- Invalid');
 
-  const userAgent = (req.headers['user-agent'] || '').toLowerCase();
-  const isBrowser = /mozilla|chrome|safari|firefox|edge|opera|trident/i.test(userAgent);
-
-  if (isBrowser) {
+  // 🎯 GAMITIN ANG BAGONG DETECTION
+  if (!isExecutorRequest(req)) {
     return res.status(403).send('-- You cannot copy this script');
   }
 
@@ -444,6 +470,7 @@ app.get('/api/get-script', async (req, res) => {
   }
 
   res.setHeader('Content-Type', 'text/plain; charset=utf-8');
+  res.setHeader('Cache-Control', 'no-store');
   return res.status(200).send(script.content);
 });
 
@@ -530,7 +557,7 @@ app.get('/api/admin/users', async (req, res) => {
   }
 });
 
-// ===== ADMIN: ALL SCRIPTS (metadata only - no content) =====
+// ===== ADMIN: ALL SCRIPTS =====
 app.get('/api/admin/scripts', async (req, res) => {
   const auth = req.headers.authorization;
   if (!auth || !auth.startsWith('Bearer ')) return res.status(401).json({ error: 'Not logged in' });
@@ -571,4 +598,5 @@ app.get('/s/:link', (req, res) => res.sendFile(path.join(__dirname, 'view.html')
 
 app.listen(PORT, () => {
   console.log(`Fov.it server running on port ${PORT}`);
+  console.log(`✅ Executor detection: ENABLED (multi-method)`);
 });
