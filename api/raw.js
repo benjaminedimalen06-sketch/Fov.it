@@ -9,19 +9,21 @@ const supabase = createClient(
 const JWT_SECRET = process.env.JWT_SECRET || 'fov-it-secret-change-me';
 
 export default async function handler(req, res) {
+  // ===== CORS =====
   res.setHeader('Access-Control-Allow-Origin', '*');
   res.setHeader('Access-Control-Allow-Methods', 'GET, OPTIONS');
   res.setHeader('Access-Control-Allow-Headers', '*');
+  res.setHeader('Content-Type', 'text/plain; charset=utf-8');
 
   if (req.method === 'OPTIONS') return res.status(200).end();
 
-  const { id, token } = req.query;
+  const { id, token, exec } = req.query;
 
   if (!id) {
-    res.setHeader('Content-Type', 'text/plain; charset=utf-8');
-    return res.status(400).send('You cannot copy this script');
+    return res.status(400).send('-- missing id');
   }
 
+  // ===== FETCH SCRIPT =====
   const { data: script, error } = await supabase
     .from('scripts')
     .select('id, title, content, public_link, user_id')
@@ -29,43 +31,46 @@ export default async function handler(req, res) {
     .maybeSingle();
 
   if (error || !script) {
-    res.setHeader('Content-Type', 'text/plain; charset=utf-8');
     return res.status(404).send('-- Script not found');
   }
 
-  const userAgent = (req.headers['user-agent'] || '').toLowerCase();
-  const isBrowser = /mozilla|chrome|safari|firefox|edge|opera|trident/i.test(userAgent);
+  const content = script.content || '-- empty script';
 
-  // ===== EXECUTOR (Roblox loadstring) =====
-  if (!isBrowser) {
-    res.setHeader('Content-Type', 'text/plain; charset=utf-8');
-    res.setHeader('Cache-Control', 'public, max-age=3600');
-    return res.status(200).send(script.content);
+  // ===== EXECUTOR PATH (Roblox loadstring) =====
+  // Reliability: query flag > executor UA > no UA > default
+  const ua = (req.headers['user-agent'] || '').toLowerCase();
+  const knownExecutor = /roblox|delta|solara|xeno|wave|krnl|fluxus|hydrogen|codex|arceus|trigon|sirhurt|synapse|script[- ]?ware|exploit/i.test(ua);
+  const noUA = !req.headers['user-agent'];
+  const isExplicitExec = exec === '1' || exec === 'true';
+
+  // Kung browser talaga (may mozilla/chrome/safari pero hindi executor)
+  const looksLikeRealBrowser =
+    /mozilla|chrome|safari|firefox|edge|opera|trident/i.test(ua) &&
+    !knownExecutor;
+
+  if (isExplicitExec || knownExecutor || noUA || !looksLikeRealBrowser) {
+    res.setHeader('Cache-Control', 'no-store');
+    return res.status(200).send(content);
   }
 
-  // ===== BROWSER =====
+  // ===== BROWSER PATH =====
   if (!token) {
-    res.setHeader('Content-Type', 'text/plain; charset=utf-8');
-    return res.status(200).send('You cannot copy this script');
+    return res.status(200).send('-- You cannot copy this script');
   }
 
   let decoded;
   try {
     decoded = jwt.verify(token, JWT_SECRET);
   } catch {
-    res.setHeader('Content-Type', 'text/plain; charset=utf-8');
-    return res.status(200).send('You cannot copy this script');
+    return res.status(200).send('-- You cannot copy this script');
   }
 
-  // Owner o may-ari lang
   const isOwner = decoded.role === 'owner';
   const isScriptOwner = decoded.id === script.user_id;
 
   if (!isOwner && !isScriptOwner) {
-    res.setHeader('Content-Type', 'text/plain; charset=utf-8');
-    return res.status(200).send('You cannot copy this script');
+    return res.status(200).send('-- You cannot copy this script');
   }
 
-  res.setHeader('Content-Type', 'text/plain; charset=utf-8');
-  return res.status(200).send(script.content);
+  return res.status(200).send(content);
 }
