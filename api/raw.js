@@ -5,8 +5,9 @@ const supabase = createClient(
   process.env.SUPABASE_SECRET
 );
 
+// Memory cache for speed
 const cache = new Map();
-const CACHE_TTL = 60000;
+const CACHE_TTL = 300000; // 5 minutes
 
 export default async function handler(req, res) {
   res.setHeader('Access-Control-Allow-Origin', '*');
@@ -22,6 +23,7 @@ export default async function handler(req, res) {
   const { id } = req.query;
   if (!id) return res.status(400).send('-- missing id');
 
+  // Check cache
   const cached = cache.get(id);
   if (cached && Date.now() - cached.time < CACHE_TTL) {
     res.setHeader('Content-Length', Buffer.byteLength(cached.content, 'utf8'));
