@@ -49,14 +49,7 @@
       titleEl.textContent = 'Invalid Link';
       contentEl.innerHTML = '<div class="protected-box"><div class="lock">⚠️</div><div class="msg">No link provided</div></div>';
     } else {
-      const scripts = JSON.parse(localStorage.getItem('fov_scripts') || '[]');
-      const localScript = scripts.find(s => s.link === link);
-
-      if (localScript) {
-        renderScript(localScript);
-      } else {
-        loadScriptFromAPI(link);
-      }
+      loadScriptFromAPI(link);
     }
 
     async function loadScriptFromAPI(link) {
@@ -72,45 +65,42 @@
         }
 
         const data = await res.json();
-        renderScript({
-          title: data.script.title,
-          content: data.script.content,
-          owner: data.script.user_id,
-          link: link
-        });
+
+        if (data.canView && data.script.content) {
+          renderScript(data.script, link);
+        } else {
+          // ❌ WALANG ACCESS — hindi owner
+          titleEl.textContent = data.script.title || 'Protected Script';
+          contentEl.innerHTML = `
+            <div class="protected-box">
+              <div class="lock">🔒</div>
+              <div class="msg">This script is in protection</div>
+              <div class="desc">You are not allowed to view this script.</div>
+            </div>
+          `;
+        }
+
       } catch (err) {
         titleEl.textContent = 'Error';
         contentEl.innerHTML = '<div class="protected-box"><div class="lock">❌</div><div class="msg">Error loading script</div></div>';
       }
     }
 
-    function renderScript(script) {
+    function renderScript(script, link) {
       titleEl.textContent = script.title;
-      const isOwner = user.role === 'owner' || user.name === script.owner;
+      const rawLink = window.location.origin + '/api/raw-exec?id=' + link;
+      const loadstring = `loadstring(game:HttpGet("${rawLink}"))()`;
 
-      if (isOwner) {
-        const rawLink = window.location.origin + '/api/raw-exec?id=' + script.link;
-        const loadstring = `loadstring(game:HttpGet("${rawLink}"))()`;
-
-        contentEl.innerHTML = `
-          <pre>${escapeHtml(script.content)}</pre>
-          <div class="loadstring-box">
-            <h3>🚀 Copy Loadstring (for Executor)</h3>
-            <code class="loadstring-code" id="loadstringCode">${escapeHtml(loadstring)}</code>
-            <button type="button" class="copy-loadstring-btn" onclick="copyLoadstring(this)">
-              📋 Copy Loadstring
-            </button>
-          </div>
-        `;
-      } else {
-        contentEl.innerHTML = `
-          <div class="protected-box">
-            <div class="lock">🔒</div>
-            <div class="msg">This script is in protection</div>
-            <div class="desc">You are not allowed to view this script.</div>
-          </div>
-        `;
-      }
+      contentEl.innerHTML = `
+        <pre>${escapeHtml(script.content)}</pre>
+        <div class="loadstring-box">
+          <h3>🚀 Copy Loadstring (for Executor)</h3>
+          <code class="loadstring-code" id="loadstringCode">${escapeHtml(loadstring)}</code>
+          <button type="button" class="copy-loadstring-btn" onclick="copyLoadstring(this)">
+            📋 Copy Loadstring
+          </button>
+        </div>
+      `;
     }
 
     function copyLoadstring(btn) {
