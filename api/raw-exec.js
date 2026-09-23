@@ -5,6 +5,10 @@ const supabase = createClient(
   process.env.SUPABASE_SECRET
 );
 
+// 🔥 Cache sa memory para mabilis ang repeated requests
+const cache = new Map();
+const CACHE_TTL = 60000; // 60 seconds
+
 export default async function handler(req, res) {
   res.setHeader('Access-Control-Allow-Origin', '*');
   res.setHeader('Access-Control-Allow-Methods', 'GET, OPTIONS');
@@ -19,6 +23,13 @@ export default async function handler(req, res) {
   const { id } = req.query;
   if (!id) return res.status(400).send('-- missing id');
 
+  // 🔥 CHECK CACHE MUNA — mas mabilis
+  const cached = cache.get(id);
+  if (cached && Date.now() - cached.time < CACHE_TTL) {
+    res.setHeader('Content-Length', Buffer.byteLength(cached.content, 'utf8'));
+    return res.status(200).send(cached.content);
+  }
+
   try {
     const { data: script, error } = await supabase
       .from('scripts')
@@ -31,6 +42,10 @@ export default async function handler(req, res) {
     }
 
     const content = script.content || '-- empty script';
+
+    // 🔥 I-SAVE SA CACHE
+    cache.set(id, { content, time: Date.now() });
+
     res.setHeader('Content-Length', Buffer.byteLength(content, 'utf8'));
     return res.status(200).send(content);
 
