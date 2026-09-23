@@ -23,7 +23,7 @@ export default async function handler(req, res) {
   // Check auth
   const auth = req.headers.authorization;
   if (!auth || !auth.startsWith('Bearer ')) {
-    return res.status(401).json({ error: 'Hindi naka-login' });
+    return res.status(401).json({ error: 'Not logged in' });
   }
 
   let user;
@@ -34,10 +34,10 @@ export default async function handler(req, res) {
   }
 
   try {
-    const { title, content } = req.body;
+    const { title, content, access_type, whitelist } = req.body;
 
     if (!title || !content) {
-      return res.status(400).json({ error: 'Title at content ay kailangan' });
+      return res.status(400).json({ error: 'Title and content are required' });
     }
 
     const link = generateLink();
@@ -48,7 +48,9 @@ export default async function handler(req, res) {
         user_id: user.id,
         title,
         content,
-        public_link: link
+        public_link: link,
+        access_type: access_type || 'public',
+        whitelist: whitelist || ''
       })
       .select()
       .single();
@@ -58,8 +60,8 @@ export default async function handler(req, res) {
       return res.status(500).json({ error: 'Failed to upload: ' + error.message });
     }
 
-    const origin = req.headers.origin || 'https://fov-it.vercel.app';
-    const rawLink = `${origin}/api/raw?id=${link}`;
+    const origin = req.headers.origin || 'https://fov-it.onrender.com';
+    const rawLink = `${origin}/api/raw-exec?id=${link}`;
 
     return res.status(201).json({
       success: true,
