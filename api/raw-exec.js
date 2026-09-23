@@ -12,6 +12,8 @@ export default async function handler(req, res) {
   res.setHeader('Access-Control-Allow-Headers', '*');
   res.setHeader('Content-Type', 'text/plain; charset=utf-8');
   res.setHeader('Cache-Control', 'no-store');
+  res.setHeader('X-Accel-Buffering', 'no');
+  res.setHeader('Connection', 'keep-alive');
 
   if (req.method === 'OPTIONS') return res.status(200).end();
 
@@ -21,17 +23,24 @@ export default async function handler(req, res) {
     return res.status(400).send('-- missing id');
   }
 
-  // ===== FETCH SCRIPT =====
-  const { data: script, error } = await supabase
-    .from('scripts')
-    .select('content')
-    .eq('public_link', id)
-    .maybeSingle();
+  try {
+    const { data: script, error } = await supabase
+      .from('scripts')
+      .select('content')
+      .eq('public_link', id)
+      .maybeSingle();
 
-  if (error || !script) {
-    return res.status(404).send('-- Script not found');
+    if (error || !script) {
+      return res.status(404).send('-- Script not found');
+    }
+
+    const content = script.content || '-- empty script';
+
+    res.setHeader('Content-Length', Buffer.byteLength(content, 'utf8'));
+
+    return res.status(200).send(content);
+
+  } catch (err) {
+    return res.status(500).send('-- Server error');
   }
-
-  // ===== RETURN PURE LUA — NO DETECTION, NO TOKEN, NO BROWSER CHECK =====
-  return res.status(200).send(script.content || '-- empty script');
 }
