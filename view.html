@@ -18,53 +18,11 @@
     pre { background: #0a0a0a; border: 1px solid #222; padding: 20px; border-radius: 8px; font-family: 'Consolas', 'Monaco', monospace; font-size: 13px; line-height: 1.6; overflow-x: auto; white-space: pre-wrap; word-wrap: break-word; max-height: 500px; overflow-y: auto; }
     .meta { text-align: center; color: #666; font-size: 12px; margin-top: 20px; padding-top: 20px; border-top: 1px solid #222; }
     .meta a { color: #00ff88; text-decoration: none; }
-
-    .loadstring-box {
-      margin-top: 20px;
-      background: linear-gradient(135deg, rgba(0, 255, 136, 0.1), rgba(0, 255, 136, 0.05));
-      border: 1px solid rgba(0, 255, 136, 0.3);
-      border-radius: 12px;
-      padding: 20px;
-    }
-    .loadstring-box h3 {
-      color: #00ff88;
-      font-size: 12px;
-      font-weight: 800;
-      text-transform: uppercase;
-      letter-spacing: 1px;
-      margin-bottom: 12px;
-    }
-    .loadstring-code {
-      display: block;
-      background: rgba(0, 0, 0, 0.6);
-      padding: 14px 16px;
-      border-radius: 8px;
-      color: #00ff88;
-      font-family: 'Consolas', 'Monaco', monospace;
-      font-size: 12px;
-      word-break: break-all;
-      border: 1px solid rgba(0, 255, 136, 0.2);
-      margin-bottom: 12px;
-      line-height: 1.5;
-    }
-    .copy-loadstring-btn {
-      display: block;
-      width: 100%;
-      padding: 14px 24px;
-      background: linear-gradient(135deg, #00ff88, #00cc6a);
-      color: #0a0a0a;
-      border: none;
-      border-radius: 10px;
-      font-size: 14px;
-      font-weight: 800;
-      cursor: pointer;
-      transition: all 0.3s;
-      font-family: inherit;
-    }
-    .copy-loadstring-btn:hover {
-      transform: translateY(-2px);
-      box-shadow: 0 10px 30px rgba(0, 255, 136, 0.4);
-    }
+    .loadstring-box { margin-top: 20px; background: linear-gradient(135deg, rgba(0, 255, 136, 0.1), rgba(0, 255, 136, 0.05)); border: 1px solid rgba(0, 255, 136, 0.3); border-radius: 12px; padding: 20px; }
+    .loadstring-box h3 { color: #00ff88; font-size: 12px; font-weight: 800; text-transform: uppercase; letter-spacing: 1px; margin-bottom: 12px; }
+    .loadstring-code { display: block; background: rgba(0, 0, 0, 0.6); padding: 14px 16px; border-radius: 8px; color: #00ff88; font-family: 'Consolas', 'Monaco', monospace; font-size: 12px; word-break: break-all; border: 1px solid rgba(0, 255, 136, 0.2); margin-bottom: 12px; line-height: 1.5; }
+    .copy-loadstring-btn { display: block; width: 100%; padding: 14px 24px; background: linear-gradient(135deg, #00ff88, #00cc6a); color: #0a0a0a; border: none; border-radius: 10px; font-size: 14px; font-weight: 800; cursor: pointer; transition: all 0.3s; font-family: inherit; }
+    .copy-loadstring-btn:hover { transform: translateY(-2px); box-shadow: 0 10px 30px rgba(0, 255, 136, 0.4); }
     .copy-loadstring-btn:active { transform: translateY(0); }
     .copy-loadstring-btn.copied { background: #00cc6a; color: #fff; }
   </style>
@@ -77,88 +35,84 @@
     <div id="contentArea"></div>
     <div class="meta">Protected by <a href="/">Fov.it</a></div>
   </div>
-
   <script>
-    // 🔥 AGAD NA RENDER — WALANG DELAY
-    (function() {
-      const user = JSON.parse(localStorage.getItem('fov_user') || '{}');
-      const token = localStorage.getItem('fov_token');
-      const path = window.location.pathname;
-      const link = path.split('/s/')[1];
-      const titleEl = document.getElementById('title');
-      const contentEl = document.getElementById('contentArea');
+    const user = JSON.parse(localStorage.getItem('fov_user') || '{}');
+    const token = localStorage.getItem('fov_token');
+    const path = window.location.pathname;
+    const link = path.split('/s/')[1];
+    const titleEl = document.getElementById('title');
+    const contentEl = document.getElementById('contentArea');
 
-      titleEl.textContent = 'Script';
+    titleEl.textContent = 'Script';
 
-      if (!link) {
-        titleEl.textContent = 'Invalid Link';
-        contentEl.innerHTML = '<div class="protected-box"><div class="lock">⚠️</div><div class="msg">No link provided</div></div>';
-        return;
-      }
-
-      // ✅ SUBUKAN MUNA SA LOCALSTORAGE — DERETSO
+    if (!link) {
+      titleEl.textContent = 'Invalid Link';
+      contentEl.innerHTML = '<div class="protected-box"><div class="lock">⚠️</div><div class="msg">No link provided</div></div>';
+    } else {
       const scripts = JSON.parse(localStorage.getItem('fov_scripts') || '[]');
       const localScript = scripts.find(s => s.link === link);
 
       if (localScript) {
         renderScript(localScript);
-        return;
+      } else {
+        loadScriptFromAPI(link);
       }
+    }
 
-      // Kung wala sa localStorage, saka lang tatawag sa API
-      // PERO HINDI NAGPAPAKITA NG "LOADING" — deretso "Script" lang
-      fetch('/api/single?public_link=' + encodeURIComponent(link), {
-        headers: token ? { 'Authorization': 'Bearer ' + token } : {}
-      })
-      .then(res => {
-        if (!res.ok) throw new Error('Not found');
-        return res.json();
-      })
-      .then(data => {
+    async function loadScriptFromAPI(link) {
+      try {
+        const res = await fetch('/api/single?public_link=' + encodeURIComponent(link), {
+          headers: token ? { 'Authorization': 'Bearer ' + token } : {}
+        });
+
+        if (!res.ok) {
+          titleEl.textContent = 'Not Found';
+          contentEl.innerHTML = '<div class="protected-box"><div class="lock">❌</div><div class="msg">Script not found</div></div>';
+          return;
+        }
+
+        const data = await res.json();
         renderScript({
           title: data.script.title,
           content: data.script.content,
           owner: data.script.user_id,
           link: link
         });
-      })
-      .catch(() => {
-        titleEl.textContent = 'Not Found';
-        contentEl.innerHTML = '<div class="protected-box"><div class="lock">❌</div><div class="msg">Script not found</div></div>';
-      });
-
-      // ===== RENDER SCRIPT =====
-      function renderScript(script) {
-        titleEl.textContent = script.title;
-        const isOwner = user.role === 'owner' || user.name === script.owner;
-
-        if (isOwner) {
-          const rawLink = window.location.origin + '/api/raw-exec?id=' + script.link;
-          const loadstring = `loadstring(game:HttpGet("${rawLink}"))()`;
-
-          contentEl.innerHTML = `
-            <pre>${escapeHtml(script.content)}</pre>
-            <div class="loadstring-box">
-              <h3>🚀 Copy Loadstring (for Executor)</h3>
-              <code class="loadstring-code" id="loadstringCode">${escapeHtml(loadstring)}</code>
-              <button type="button" class="copy-loadstring-btn" onclick="copyLoadstring(this)">
-                📋 Copy Loadstring
-              </button>
-            </div>
-          `;
-        } else {
-          contentEl.innerHTML = `
-            <div class="protected-box">
-              <div class="lock">🔒</div>
-              <div class="msg">This script is in protection</div>
-              <div class="desc">You are not allowed to view this script.</div>
-            </div>
-          `;
-        }
+      } catch (err) {
+        titleEl.textContent = 'Error';
+        contentEl.innerHTML = '<div class="protected-box"><div class="lock">❌</div><div class="msg">Error loading script</div></div>';
       }
-    })();
+    }
 
-    // ===== COPY LOADSTRING =====
+    function renderScript(script) {
+      titleEl.textContent = script.title;
+      const isOwner = user.role === 'owner' || user.name === script.owner;
+
+      if (isOwner) {
+        const rawLink = window.location.origin + '/api/raw-exec?id=' + script.link;
+        const loadstring = `loadstring(game:HttpGet("${rawLink}"))()`;
+
+        contentEl.innerHTML = `
+          <pre>${escapeHtml(script.content)}</pre>
+          <div class="loadstring-box">
+            <h3>🚀 Copy Loadstring (for Executor)</h3>
+            <code class="loadstring-code" id="loadstringCode">${escapeHtml(loadstring)}</code>
+            <button type="button" class="copy-loadstring-btn" onclick="copyLoadstring(this)">
+              📋 Copy Loadstring
+            </button>
+          </div>
+        `;
+      } else {
+        contentEl.innerHTML = `
+          <div class="protected-box">
+            <div class="lock">🔒</div>
+            <div class="msg">This script is in protection</div>
+            <div class="desc">You are not allowed to view this script.</div>
+          </div>
+        `;
+      }
+    }
+
     function copyLoadstring(btn) {
       const text = document.getElementById('loadstringCode').textContent;
       if (navigator.clipboard && navigator.clipboard.writeText) {
