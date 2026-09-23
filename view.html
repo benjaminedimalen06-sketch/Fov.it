@@ -79,7 +79,7 @@
     <div class="subtitle">Script Protection System</div>
     <h1 id="title">Script</h1>
     <div id="contentArea"></div>
-    <div class="meta">Protektado ng <a href="/">Fov.it</a></div>
+    <div class="meta">Protected by <a href="/">Fov.it</a></div>
   </div>
   <script>
     const user = JSON.parse(localStorage.getItem('fov_user') || '{}');
@@ -89,12 +89,12 @@
     const titleEl = document.getElementById('title');
     const contentEl = document.getElementById('contentArea');
 
-    // Default — hindi na "Loading..."
+    // Default — no "Loading..." anymore
     titleEl.textContent = 'Script';
 
     if (!link) {
       titleEl.textContent = 'Invalid Link';
-      contentEl.innerHTML = '<div class="protected-box"><div class="lock">⚠️</div><div class="msg">Walang link</div></div>';
+      contentEl.innerHTML = '<div class="protected-box"><div class="lock">⚠️</div><div class="msg">No link provided</div></div>';
     } else {
       const scripts = JSON.parse(localStorage.getItem('fov_scripts') || '[]');
       const localScript = scripts.find(s => s.link === link);
@@ -106,7 +106,7 @@
       }
     }
 
-    // ===== KUNAIN ANG SCRIPT MULA SA API =====
+    // ===== FETCH SCRIPT FROM API =====
     async function loadScriptFromAPI(link) {
       try {
         const res = await fetch('/api/single?public_link=' + encodeURIComponent(link), {
@@ -133,7 +133,7 @@
       }
     }
 
-    // ===== I-RENDER ANG SCRIPT =====
+    // ===== RENDER SCRIPT =====
     function renderScript(script) {
       titleEl.textContent = script.title;
       const isOwner = user.role === 'owner' || user.name === script.owner;
@@ -159,7 +159,7 @@
           <div class="protected-box">
             <div class="lock">🔒</div>
             <div class="msg">This script is in protection</div>
-            <div class="desc">Hindi mo maaaring makita ang script na ito.</div>
+            <div class="desc">You are not allowed to view this script.</div>
           </div>
         `;
       }
@@ -177,7 +177,7 @@
           btn.classList.remove('copied');
         }, 2000);
       } catch (err) {
-        // Fallback
+        // Fallback for old browsers
         const textarea = document.createElement('textarea');
         textarea.value = text;
         document.body.appendChild(textarea);
