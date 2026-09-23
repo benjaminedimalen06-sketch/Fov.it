@@ -12,17 +12,23 @@ export default async function handler(req, res) {
 
   if (req.method === 'OPTIONS') return res.status(200).end();
 
-  const { id } = req.query;
+  const { id, public_link } = req.query;
 
-  if (!id) {
-    return res.status(400).json({ error: 'Script ID kailangan' });
+  if (!id && !public_link) {
+    return res.status(400).json({ error: 'Script ID o public_link kailangan' });
   }
 
-  const { data, error } = await supabase
+  let query = supabase
     .from('scripts')
-    .select('id, title, content, public_link, created_at, updated_at')
-    .eq('id', id)
-    .maybeSingle();
+    .select('id, title, content, public_link, created_at, updated_at, user_id');
+
+  if (id) {
+    query = query.eq('id', id);
+  } else {
+    query = query.eq('public_link', public_link);
+  }
+
+  const { data, error } = await query.maybeSingle();
 
   if (error || !data) {
     return res.status(404).json({ error: 'Script not found' });
